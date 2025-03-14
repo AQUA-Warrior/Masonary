@@ -3,14 +3,33 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Masonry Layout</title>
+  <title>masonary layout</title>
   <link rel="stylesheet" href="/style.css">
+  <script src="https://unpkg.com/masonry-layout@4/dist/masonry.pkgd.min.js" defer></script>
 </head>
 <body>
   <div class="masonry">
     <div class="masonry-item"><img src="https://wallpapercave.com/wp/wp9343692.jpg"></div>
+    <div class="masonry-item"><img src="https://wallpapercave.com/wp/wp9343692.jpg"></div>
     <div class="masonry-item"><img src="https://th.bing.com/th/id/OIP.ykMjb5C4YStieasAFD6P5AHaE6?rs=1&pid=ImgDetMain"></div>
     <div class="masonry-item"><img src="https://th.bing.com/th/id/OIP.6dnI94yWp66Lh4eKCeFTawHaOh?rs=1&pid=ImgDetMain"></div>
+    <div class="masonry-item"><img src="https://th.bing.com/th/id/OIP.ykMjb5C4YStieasAFD6P5AHaE6?rs=1&pid=ImgDetMain"></div>
+    <div class="masonry-item"><img src="https://wallpapercave.com/wp/wp9343692.jpg"></div>
+    <div class="masonry-item"><img src="https://th.bing.com/th/id/OIP.ykMjb5C4YStieasAFD6P5AHaE6?rs=1&pid=ImgDetMain"></div>
+    <div class="masonry-item"><img src="https://th.bing.com/th/id/OIP.6dnI94yWp66Lh4eKCeFTawHaOh?rs=1&pid=ImgDetMain"></div>
+    <div class="masonry-item"><img src="https://th.bing.com/th/id/OIP.6dnI94yWp66Lh4eKCeFTawHaOh?rs=1&pid=ImgDetMain"></div>
   </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      new Masonry(".masonry", {
+        itemSelector: ".masonry-item",
+        columnWidth: ".masonry-item",
+        gutter: 15,
+        horizontalOrder: true
+      });
+    });
+  </script>
+
 </body>
 </html>

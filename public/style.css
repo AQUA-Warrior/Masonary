@@ -1,18 +1,15 @@
 .masonry {
-  column-count: 5;
-  column-gap: 20px;
-  padding: 20px;
+  display: flex;
+  flex-wrap: wrap;
 }
 
 .masonry-item {
-  display: inline-block;
-  width: 100%;
-  margin-bottom: 20px;
+  width: calc(20% - 20px);
+  margin-bottom: 15px;
   background-color: white;
   border-radius: 10px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   overflow: hidden;
-  break-inside: avoid;
 }
 
 .masonry-item img {
@@ -26,14 +23,26 @@
   transform: scale(1.05);
 }
 
+@media (max-width: 1200px) {
+  .masonry-item {
+    width: calc(25% - 20px);
+  }
+}
+
 @media (max-width: 1024px) {
-  .masonry {
-    column-count: 2;
+  .masonry-item {
+    width: calc(33.33% - 20px);
   }
 }
 
 @media (max-width: 768px) {
-  .masonry {
-    column-count: 1;
+  .masonry-item {
+    width: calc(50% - 20px);
+  }
+}
+
+@media (max-width: 480px) {
+  .masonry-item {
+    width: 100%;
   }
 }
