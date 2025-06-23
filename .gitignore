@@ -1,3 +1,8 @@
+request.rest
+users.json
+images.json
+uploads/
+
 # Logs
 logs
 *.log

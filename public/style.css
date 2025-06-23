@@ -46,3 +46,32 @@
     width: 100%;
   }
 }
+
+#auth-section, #upload-section {
+  margin: 20px 0;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+#login-form input, #login-form button, #upload-form input, #upload-form button {
+  padding: 6px 10px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+.delete-btn {
+  display: block;
+  margin: 10px auto 10px auto;
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.delete-btn:hover {
+  background: #c0392b;
+}
