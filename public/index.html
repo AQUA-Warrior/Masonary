@@ -40,6 +40,7 @@
     function renderImages(images, loggedIn) {
       const masonry = document.getElementById('masonry');
       masonry.innerHTML = '';
+      const imageElements = [];
       images.forEach(url => {
         const filename = url.split('/').pop();
         const div = document.createElement('div');
@@ -53,13 +54,25 @@
           div.appendChild(btn);
         }
         masonry.appendChild(div);
+        imageElements.push(div.querySelector('img'));
       });
-      if (msnry) msnry.destroy();
-      msnry = new Masonry('.masonry', {
-        itemSelector: '.masonry-item',
-        columnWidth: '.masonry-item',
-        gutter: 15,
-        horizontalOrder: true
+
+      // Wait for all images to load before initializing Masonry
+      Promise.all(
+        imageElements.map(img => {
+          if (img.complete) return Promise.resolve();
+          return new Promise(resolve => {
+            img.onload = img.onerror = resolve;
+          });
+        })
+      ).then(() => {
+        if (msnry) msnry.destroy();
+        msnry = new Masonry('.masonry', {
+          itemSelector: '.masonry-item',
+          columnWidth: '.masonry-item',
+          gutter: 15,
+          horizontalOrder: true
+        });
       });
     }
 
