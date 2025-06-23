@@ -22,10 +22,15 @@
       <button type="submit">Upload Image(s)</button>
     </form>
   </div>
+  <div id="delete-selected-section" style="display:none; margin-bottom: 15px;">
+    <button id="delete-selected-btn" disabled>Delete Selected</button>
+  </div>
   <div class="masonry" id="masonry"></div>
 
   <script>
     let msnry = null;
+    let selectedImages = new Set();
+    let loggedInGlobal = false;
 
     function getToken() {
       return localStorage.getItem('token');
@@ -35,6 +40,17 @@
       document.getElementById('login-form').style.display = loggedIn ? 'none' : '';
       document.getElementById('logout-btn').style.display = loggedIn ? '' : 'none';
       document.getElementById('upload-section').style.display = loggedIn ? '' : 'none';
+      document.getElementById('delete-selected-section').style.display = loggedIn ? '' : 'none';
+      loggedInGlobal = loggedIn;
+      if (!loggedIn) {
+        selectedImages.clear();
+        updateDeleteSelectedBtn();
+      }
+    }
+
+    function updateDeleteSelectedBtn() {
+      const btn = document.getElementById('delete-selected-btn');
+      btn.disabled = selectedImages.size === 0;
     }
 
     function renderImages(images, loggedIn) {
@@ -45,11 +61,53 @@
         const filename = url.split('/').pop();
         const div = document.createElement('div');
         div.className = 'masonry-item';
-        div.innerHTML = `<img src="${url}">`;
+
+        // Checkbox for selection
+        let checkboxHtml = '';
+        if (loggedIn) {
+          checkboxHtml = `
+            <input type="checkbox" class="select-checkbox" data-filename="${filename}" style="position:absolute;top:8px;left:8px;z-index:2;display:none;">
+          `;
+        }
+
+        div.innerHTML = `
+          ${checkboxHtml}
+          <img src="${url}">
+        `;
+
+        if (loggedIn) {
+          // Show checkbox on hover or if selected
+          const checkbox = div.querySelector('.select-checkbox');
+          if (selectedImages.has(filename)) {
+            checkbox.checked = true;
+            checkbox.style.display = 'block';
+            div.classList.add('selected');
+          }
+          div.addEventListener('mouseenter', () => {
+            checkbox.style.display = 'block';
+          });
+          div.addEventListener('mouseleave', () => {
+            if (!checkbox.checked) checkbox.style.display = 'none';
+          });
+          checkbox.addEventListener('change', (e) => {
+            if (checkbox.checked) {
+              selectedImages.add(filename);
+              checkbox.style.display = 'block';
+              div.classList.add('selected');
+            } else {
+              selectedImages.delete(filename);
+              checkbox.style.display = 'none';
+              div.classList.remove('selected');
+            }
+            updateDeleteSelectedBtn();
+          });
+        }
+
         if (loggedIn) {
           const btn = document.createElement('button');
-          btn.textContent = 'Delete';
+          btn.innerHTML = '&times;';
           btn.className = 'delete-btn';
+          btn.title = 'Delete';
           btn.onclick = () => deleteImage(filename);
           div.appendChild(btn);
         }
@@ -79,8 +137,7 @@
     async function loadImages() {
       const res = await fetch('/api/images');
       const images = await res.json();
-      const loggedIn = !!getToken();
-      renderImages(images, loggedIn);
+      renderImages(images, loggedInGlobal);
     }
 
     document.getElementById('login-form').onsubmit = async e => {
@@ -135,9 +192,33 @@
         method: 'DELETE',
         headers: { 'Authorization': 'Bearer ' + getToken() }
       });
-      if (res.ok) loadImages();
+      if (res.ok) {
+        selectedImages.delete(filename);
+        updateDeleteSelectedBtn();
+        loadImages();
+      }
       else alert('Delete failed');
     }
+
+    async function deleteSelectedImages() {
+      if (selectedImages.size === 0) return;
+      if (!confirm('Delete selected images?')) return;
+      const filenames = Array.from(selectedImages);
+      let failed = false;
+      for (const filename of filenames) {
+        const res = await fetch('/api/images/' + filename, {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + getToken() }
+        });
+        if (!res.ok) failed = true;
+      }
+      selectedImages.clear();
+      updateDeleteSelectedBtn();
+      loadImages();
+      if (failed) alert('Some images could not be deleted.');
+    }
+
+    document.getElementById('delete-selected-btn').onclick = deleteSelectedImages;
 
     async function checkLogin() {
       const token = getToken();

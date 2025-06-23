@@ -10,6 +10,7 @@
   border-radius: 10px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   overflow: hidden;
+  position: relative;
 }
 
 .masonry-item img {
@@ -21,6 +22,53 @@
 
 .masonry-item img:hover {
   transform: scale(1.05);
+}
+
+/* Delete button styles for overlay */
+.delete-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: none;
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  font-size: 18px;
+  font-weight: bold;
+  line-height: 28px;
+  text-align: center;
+  padding: 0;
+  cursor: pointer;
+  transition: background 0.2s;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.masonry-item:hover .delete-btn {
+  display: block;
+}
+
+.delete-btn:hover {
+  background: #c0392b;
+}
+
+.select-checkbox {
+  accent-color: #e67e22;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 2px solid #e67e22;
+  background: white;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transition: border 0.2s;
+}
+
+.masonry-item.selected {
+  box-shadow: 0 0 0 3px #e67e22, 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 @media (max-width: 1200px) {
@@ -58,20 +106,4 @@
   padding: 6px 10px;
   border-radius: 5px;
   border: 1px solid #ccc;
-}
-
-.delete-btn {
-  display: block;
-  margin: 10px auto 10px auto;
-  background: #e74c3c;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  padding: 6px 12px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.delete-btn:hover {
-  background: #c0392b;
 }

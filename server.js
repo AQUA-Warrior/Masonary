@@ -29,7 +29,7 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 * 1024 } // 5GB
 });
 
-const USER = { username: 'abc', password: 'abc' };
+const USER = { username: 'abc', password: 'abc' }; // remove later
 
 function authenticateToken(req, res, next) {
   const auth = req.headers['authorization'];
@@ -65,6 +65,11 @@ app.get('/api/images', (req, res) => {
     if (err) return res.json([]);
     const images = files
       .filter(f => /\.(jpg|jpeg|png|gif)$/i.test(f))
+      .sort((a, b) => {
+        const aTime = fs.statSync(path.join(uploadsDir, a)).ctimeMs;
+        const bTime = fs.statSync(path.join(uploadsDir, b)).ctimeMs;
+        return bTime - aTime;
+      })
       .map(f => `/uploads/${f}`);
     res.json(images);
   });
