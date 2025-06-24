@@ -27,6 +27,66 @@
   </div>
   <div class="masonry" id="masonry"></div>
 
+  <div id="theme-manager" class="theme-manager">
+    <button id="theme-btn" class="theme-btn">🎨</button>
+    <div id="theme-popup" class="theme-popup hidden">
+      <h3>Theme Editor</h3>
+      <div id="theme-list" class="theme-list"></div>
+      <div class="theme-editor">
+        <div class="theme-editor-header">
+          <h4>Edit Theme</h4>
+          <div class="theme-editor-actions">
+            <button class="theme-editor-btn revert-btn" onclick="revertThemeChanges()" style="display: none;">Revert</button>
+            <button class="theme-editor-btn save-btn" onclick="saveThemeChanges()" style="display: none;">Save Changes</button>
+          </div>
+        </div>
+        <div class="theme-property">
+          <label>Text Color</label>
+          <input type="color" data-var="--text">
+        </div>
+        <div class="theme-property">
+          <label>Background</label>
+          <input type="color" data-var="--background">
+        </div>
+        <div class="theme-property">
+          <label>Primary</label>
+          <input type="color" data-var="--primary">
+        </div>
+        <div class="theme-property">
+          <label>Secondary</label>
+          <input type="color" data-var="--secondary">
+        </div>
+        <div class="theme-property">
+          <label>Accent</label>
+          <input type="color" data-var="--accent">
+        </div>
+        <div class="theme-property">
+          <label>Delete Button</label>
+          <input type="color" data-var="--delete">
+        </div>
+        <div class="theme-font-editor">
+          <div class="theme-font-property">
+            <label>Font Family</label>
+            <select data-var="--font-family">
+              <option value="Arial, sans-serif">Arial</option>
+              <option value="'Roboto', sans-serif">Roboto</option>
+              <option value="'Open Sans', sans-serif">Open Sans</option>
+              <option value="'Helvetica Neue', sans-serif">Helvetica Neue</option>
+            </select>
+          </div>
+          <div class="theme-font-property">
+            <label>Base Font Size</label>
+            <input type="number" data-var="--font-size-base" min="12" max="24" step="1">
+          </div>
+        </div>
+      </div>
+      <div class="theme-create">
+        <input type="text" id="new-theme-name" placeholder="Theme name">
+        <button onclick="saveCurrentTheme()">Save Theme</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let msnry = null;
     let selectedImages = new Set();
@@ -238,6 +298,257 @@
     }
 
     document.addEventListener("DOMContentLoaded", checkLogin);
+  </script>
+  <script>
+    // Theme logic
+    let originalThemeValues = {};
+
+    document.getElementById('theme-btn').addEventListener('click', () => {
+      document.getElementById('theme-popup').classList.toggle('hidden');
+    });
+
+    document.addEventListener('click', (e) => {
+      const popup = document.getElementById('theme-popup');
+      const btn = document.getElementById('theme-btn');
+      if (!popup.contains(e.target) && !btn.contains(e.target)) {
+        popup.classList.add('hidden');
+      }
+    });
+
+    async function loadThemes() {
+      try {
+        const response = await fetch('/api/themes');
+        const themes = await response.json();
+        const themeList = document.getElementById('theme-list');
+        themeList.innerHTML = themes.map(theme => `
+          <div class="theme-item">
+            <input type="text" class="theme-name-input"
+              value="${theme.name}"
+              onchange="updateThemeName(${theme.id}, this.value)"
+              ${Number(theme.is_default) ? 'disabled' : ''}>
+            <div class="theme-item-actions">
+              <button onclick="applyTheme(${theme.id})" class="theme-apply">Apply Theme</button>
+              ${!Number(theme.is_default) ? `<button onclick="deleteTheme(${theme.id}, event)" class="delete-btn">Remove</button>` : ''}
+            </div>
+          </div>
+        `).join('');
+      } catch (error) {
+        console.error('Error loading themes:', error);
+      }
+    }
+
+    async function updateThemeName(id, newName) {
+      if (!newName.trim()) return;
+      try {
+        const response = await fetch(`/api/themes/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newName.trim() })
+        });
+        if (!response.ok) {
+          const error = await response.json();
+          alert(error.error);
+          await loadThemes();
+        }
+      } catch (error) {
+        console.error('Error updating theme name:', error);
+        await loadThemes();
+      }
+    }
+
+    function rgbToHex(color) {
+      if (color.startsWith('#')) return color;
+      const rgb = color.match(/\d+/g);
+      if (!rgb) return '#000000';
+      const r = parseInt(rgb[0]);
+      const g = parseInt(rgb[1]);
+      const b = parseInt(rgb[2]);
+      return '#' + [r, g, b].map(x => {
+        const hex = x.toString(16);
+        return hex.length === 1 ? '0' + hex : hex;
+      }).join('');
+    }
+
+    async function applyTheme(id) {
+      try {
+        const response = await fetch('/api/themes');
+        const themes = await response.json();
+        const theme = themes.find(t => t.id === id);
+        if (!theme) return;
+        const colors = JSON.parse(theme.colors);
+        localStorage.setItem('activeThemeId', id);
+        Object.entries(colors).forEach(([key, value]) => {
+          document.documentElement.style.setProperty(`--${key}`, value);
+        });
+        document.querySelectorAll('.theme-property input[type="color"]').forEach(input => {
+          const varName = input.dataset.var;
+          if (varName) {
+            const colorName = varName.substring(2);
+            if (colors[colorName]) {
+              input.value = rgbToHex(colors[colorName]);
+            }
+          }
+        });
+        document.querySelectorAll('.theme-font-property input, .theme-font-property select').forEach(input => {
+          const varName = input.dataset.var;
+          if (varName) {
+            const propName = varName.substring(2);
+            if (colors[propName]) {
+              let value = colors[propName];
+              if (input.type === 'number') {
+                value = parseInt(value.replace('px', ''));
+              }
+              input.value = value;
+            }
+          }
+        });
+        originalThemeValues = {};
+        document.querySelectorAll('[data-var]').forEach(input => {
+          const varName = input.dataset.var;
+          const computedValue = getComputedStyle(document.documentElement)
+            .getPropertyValue(varName).trim();
+          originalThemeValues[varName] = computedValue;
+        });
+        hideThemeButtons();
+      } catch (error) {
+        console.error('Error applying theme:', error);
+      }
+    }
+
+    async function loadSavedTheme() {
+      const savedThemeId = localStorage.getItem('activeThemeId');
+      if (savedThemeId) {
+        await applyTheme(parseInt(savedThemeId));
+      }
+    }
+
+    function initThemeEditor() {
+      const root = document.documentElement;
+      const style = getComputedStyle(root);
+      originalThemeValues = {};
+      document.querySelectorAll('.theme-property input[type="color"]').forEach(input => {
+        const varName = input.dataset.var;
+        const color = style.getPropertyValue(varName).trim();
+        input.value = rgbToHex(color);
+        originalThemeValues[varName] = color;
+        input.addEventListener('input', (e) => {
+          root.style.setProperty(varName, e.target.value);
+          showThemeButtons();
+        });
+      });
+      document.querySelectorAll('.theme-font-property input, .theme-font-property select').forEach(input => {
+        const varName = input.dataset.var;
+        let value = style.getPropertyValue(varName).trim();
+        if (input.type === 'number') {
+          value = parseInt(value);
+        }
+        input.value = value;
+        originalThemeValues[varName] = value;
+        input.addEventListener('change', (e) => {
+          let newValue = e.target.value;
+          if (input.type === 'number') {
+            newValue = `${newValue}px`;
+          }
+          root.style.setProperty(varName, newValue);
+          showThemeButtons();
+        });
+      });
+    }
+
+    function showThemeButtons() {
+      document.querySelector('.revert-btn').style.display = 'block';
+      document.querySelector('.save-btn').style.display = 'block';
+    }
+    function hideThemeButtons() {
+      document.querySelector('.revert-btn').style.display = 'none';
+      document.querySelector('.save-btn').style.display = 'none';
+    }
+    function revertThemeChanges() {
+      const root = document.documentElement;
+      Object.entries(originalThemeValues).forEach(([varName, value]) => {
+        root.style.setProperty(varName, value);
+        const input = document.querySelector(`[data-var="${varName}"]`);
+        if (input) {
+          if (input.type === 'color') {
+            input.value = rgbToHex(value);
+          } else {
+            input.value = input.type === 'number' ? parseInt(value) : value;
+          }
+        }
+      });
+      hideThemeButtons();
+    }
+    function saveThemeChanges() {
+      const root = document.documentElement;
+      const style = getComputedStyle(root);
+      Object.keys(originalThemeValues).forEach(varName => {
+        originalThemeValues[varName] = style.getPropertyValue(varName).trim();
+      });
+      hideThemeButtons();
+    }
+    async function saveCurrentTheme() {
+      const name = document.getElementById('new-theme-name').value.trim();
+      if (!name) {
+        alert('Please enter a theme name');
+        return;
+      }
+      const colors = {};
+      document.querySelectorAll('[data-var]').forEach(input => {
+        const varName = input.dataset.var.substring(2);
+        let value = getComputedStyle(document.documentElement).getPropertyValue(input.dataset.var).trim();
+        if (input.type === 'number') {
+          value = value.replace('px', '') + 'px';
+        }
+        colors[varName] = value;
+      });
+      try {
+        const response = await fetch('/api/themes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, colors })
+        });
+        if (!response.ok) {
+          const error = await response.json();
+          alert(error.error);
+          return;
+        }
+        const result = await response.json();
+        document.getElementById('new-theme-name').value = '';
+        await loadThemes();
+        await applyTheme(result.id);
+      } catch (error) {
+        console.error('Error saving theme:', error);
+        alert('Failed to save theme');
+      }
+    }
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadThemes();
+      await loadSavedTheme();
+      initThemeEditor();
+    });
+    async function deleteTheme(themeId, event) {
+      event.stopPropagation();
+      if (!confirm('Are you sure you want to delete this theme?')) return;
+      try {
+        const response = await fetch(`/api/themes/${themeId}`, {
+          method: 'DELETE'
+        });
+        if (!response.ok) {
+          const error = await response.json();
+          alert(error.error);
+        } else {
+          await loadThemes();
+        }
+      } catch (error) {
+        console.error('Error deleting theme:', error);
+        alert('Failed to delete theme');
+      }
+    }
+
+    // Make theme functions available globally for inline event handlers
+    window.deleteTheme = deleteTheme;
+    window.applyTheme = applyTheme;
+    window.updateThemeName = updateThemeName;
   </script>
 </body>
 </html>
