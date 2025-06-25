@@ -485,6 +485,59 @@ body {
   box-shadow: 0 0 0 3px var(--accent), var(--shadow-md);
 }
 
+#add-tags-selected-btn {
+  background: var(--primary);
+  color: var(--background);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-weight: bold;
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: var(--font-size-md);
+  padding: 6px 16px;
+  transition: background var(--transition), color var(--transition);
+  margin-left: 0;
+  margin-right: 0;
+}
+#add-tags-selected-btn:disabled {
+  background: var(--secondary);
+  color: var(--text);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+#add-tags-selected-btn:hover:enabled {
+  background: var(--accent);
+  color: var(--background);
+}
+
+.masonry-item .image-tags {
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.masonry-item:hover .image-tags {
+  opacity: 1;
+}
+
+.masonry-item .tag-edit-btn {
+  position: absolute;
+  left: 8px;
+  bottom: 38px;
+  z-index: 3;
+  background: var(--primary);
+  color: var(--background);
+  border: none;
+  border-radius: 8px;
+  padding: 2px 8px;
+  font-size: 15px;
+  cursor: pointer;
+  opacity: 0.85;
+  transition: background 0.2s, color 0.2s;
+}
+.masonry-item .tag-edit-btn:hover {
+  opacity: 1;
+}
+
 @media (max-width: 1200px) {
   .masonry-item {
     width: calc(25% - 20px);

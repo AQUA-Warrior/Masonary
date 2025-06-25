@@ -57,6 +57,10 @@ db.serialize(() => {
       "font-size-base": "16px"
     }'
   )`);
+  db.run(`CREATE TABLE IF NOT EXISTS image_tags (
+    filename TEXT PRIMARY KEY,
+    tags TEXT DEFAULT '[]'
+  )`);
 });
 
 function authenticateToken(req, res, next) {
@@ -97,9 +101,30 @@ app.get('/api/images', (req, res) => {
         const aTime = fs.statSync(path.join(uploadsDir, a)).ctimeMs;
         const bTime = fs.statSync(path.join(uploadsDir, b)).ctimeMs;
         return bTime - aTime;
-      })
-      .map(f => `/uploads/${f}`);
-    res.json(images);
+      });
+    if (images.length === 0) return res.json([]);
+    db.all(
+      `SELECT filename, tags FROM image_tags WHERE filename IN (${images.map(() => '?').join(',')})`,
+      images,
+      (err, rows) => {
+        const tagMap = {};
+        if (rows) {
+          rows.forEach(row => {
+            try {
+              tagMap[row.filename] = JSON.parse(row.tags);
+            } catch {
+              tagMap[row.filename] = [];
+            }
+          });
+        }
+        const result = images.map(f => ({
+          url: `/uploads/${f}`,
+          filename: f,
+          tags: tagMap[f] || []
+        }));
+        res.json(result);
+      }
+    );
   });
 });
 
@@ -109,11 +134,46 @@ app.post('/api/upload', authenticateToken, upload.array('image', 100), (req, res
   res.json({ urls });
 });
 
+app.post('/api/images/:filename/tags', authenticateToken, (req, res) => {
+  const filename = req.params.filename;
+  const { tags } = req.body;
+  if (!Array.isArray(tags)) return res.status(400).json({ error: 'Tags must be an array' });
+  db.run(
+    `INSERT INTO image_tags (filename, tags) VALUES (?, ?)
+     ON CONFLICT(filename) DO UPDATE SET tags=excluded.tags`,
+    [filename, JSON.stringify(tags)],
+    function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true });
+    }
+  );
+});
+
+app.post('/api/images/bulk-tags', authenticateToken, (req, res) => {
+  const { filenames, tags } = req.body;
+  if (!Array.isArray(filenames) || !Array.isArray(tags)) {
+    return res.status(400).json({ error: 'filenames and tags must be arrays' });
+  }
+  const stmt = db.prepare(
+    `INSERT INTO image_tags (filename, tags) VALUES (?, ?)
+     ON CONFLICT(filename) DO UPDATE SET tags=excluded.tags`
+  );
+  for (const filename of filenames) {
+    stmt.run(filename, JSON.stringify(tags));
+  }
+  stmt.finalize(err => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
 app.delete('/api/images/:filename', authenticateToken, (req, res) => {
   const filePath = path.join(uploadsDir, req.params.filename);
   fs.unlink(filePath, err => {
     if (err) return res.status(404).json({ error: 'File not found' });
-    res.json({ success: true });
+    db.run('DELETE FROM image_tags WHERE filename = ?', [req.params.filename], () => {
+      res.json({ success: true });
+    });
   });
 });
 
