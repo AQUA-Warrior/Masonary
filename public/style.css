@@ -520,9 +520,10 @@ body {
 }
 
 .masonry-item .tag-edit-btn {
+  display: none;
   position: absolute;
-  left: 8px;
-  bottom: 38px;
+  right: 8px;
+  bottom: 8px;
   z-index: 3;
   background: var(--primary);
   color: var(--background);
@@ -537,58 +538,114 @@ body {
 .masonry-item .tag-edit-btn:hover {
   opacity: 1;
 }
-
-@media (max-width: 1200px) {
-  .masonry-item {
-    width: calc(25% - 20px);
-  }
+.masonry-item:hover .tag-edit-btn {
+  display: block;
 }
 
-@media (max-width: 1024px) {
-  .masonry-item {
-    width: calc(33.33% - 20px);
-  }
+.image-tag-box {
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  padding: 2px 10px 2px 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin: 0;
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
 }
 
-@media (max-width: 768px) {
-  .masonry-item {
-    width: calc(50% - 20px);
-  }
+#tag-checkbox-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 10px;
+  margin-bottom: 8px;
+  padding: 4px 0;
+  min-height: 32px;
+  max-width: 480px;
 }
 
-@media (max-width: 480px) {
-  .masonry-item {
+#tag-checkbox-list label {
+  display: flex;
+  align-items: center;
+  background: rgba(108,179,190,0.12);
+  border-radius: 16px;
+  padding: 4px 8px 4px 8px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  border: 1px solid var(--secondary);
+  transition: background 0.15s, border 0.15s;
+  margin: 0;
+  user-select: none;
+  min-width: 90px;
+  max-width: 110px;
+  width: 110px;
+  box-sizing: border-box;
+  overflow: hidden;
+  white-space: nowrap;
+  flex: 0 1 21%; /* ~5 per row */
+}
+
+#tag-checkbox-list label span {
+  display: inline-block;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#tag-checkbox-list label input[type="checkbox"] {
+  accent-color: var(--accent);
+  margin-right: 8px;
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  border: 2px solid var(--accent);
+  background: var(--white);
+  transition: box-shadow 0.15s, border 0.15s, background 0.15s;
+  box-shadow: 0 1px 4px rgba(108,179,190,0.12);
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+#tag-checkbox-list label:hover {
+  background: rgba(108,179,190,0.22);
+  border-color: var(--accent);
+}
+
+#tag-checkbox-list label input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(108,179,190,0.18);
+}
+
+#tag-checkbox-list label input[type="checkbox"]:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+@media (max-width: 900px) {
+  #tag-checkbox-list {
+    max-width: 100%;
+  }
+  #tag-checkbox-list label {
+    flex: 0 1 45%; /* 2 per row */
+    min-width: 80px;
+    max-width: 100%;
     width: 100%;
   }
 }
-
-#image-input[type="file"] {
-  background: var(--background);
-  color: var(--text);
-  border: 1px solid var(--secondary);
-  border-radius: var(--radius-sm);
-  font-family: var(--font-family);
-  font-size: var(--font-size-md);
-  padding: 6px 10px;
-  transition: background var(--transition), color var(--transition), border var(--transition);
-}
-
-#image-input[type="file"]::file-selector-button {
-  background: var(--primary);
-  color: var(--background);
-  border: none;
-  border-radius: var(--radius-sm);
-  font-family: var(--font-family);
-  font-size: var(--font-size-md);
-  font-weight: bold;
-  padding: 6px 16px;
-  cursor: pointer;
-  transition: background var(--transition), color var(--transition);
-}
-
-#image-input[type="file"]::file-selector-button:hover {
-  background: var(--accent);
-  color: var(--background);
+@media (max-width: 700px) {
+  #tag-checkbox-list label {
+    flex: 0 1 98%; /* 1 per row */
+    min-width: 70px;
+    max-width: 100%;
+    width: 100%;
+  }
 }
 
 body, html {

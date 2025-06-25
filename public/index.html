@@ -93,9 +93,8 @@
     let selectedImages = new Set();
     let loggedInGlobal = false;
 
-    // --- Tag Modal ---
     let tagModal = null;
-    function showTagModal({ filenames, currentTags, onSave }) {
+    function showTagModal({ filenames, currentTags, allTags = [], onSave, images = [] }) {
       if (tagModal) tagModal.remove();
       tagModal = document.createElement('div');
       tagModal.style.position = 'fixed';
@@ -108,12 +107,47 @@
       tagModal.style.alignItems = 'center';
       tagModal.style.justifyContent = 'center';
       tagModal.style.zIndex = 2000;
+
+      let tagSets = images.length ? images.map(img => new Set(img.tags || [])) : [new Set(allTags)];
+      let allTagList = images.length
+        ? Array.from(new Set([].concat(...images.map(img => img.tags || []))))
+        : [...allTags];
+      let commonTags = images.length
+        ? allTagList.filter(tag => tagSets.every(set => set.has(tag)))
+        : [...allTags];
+
+      let tagStates = {};
+      allTagList.forEach(tag => {
+        if (commonTags.includes(tag)) tagStates[tag] = 'checked';
+        else tagStates[tag] = 'indeterminate';
+      });
+
+      function renderTagCheckboxes() {
+        return allTagList.map(tag => {
+          let state = tagStates[tag];
+          let checked = state === 'checked' ? 'checked' : '';
+          let indeterminate = state === 'indeterminate' ? 'data-indeterminate="true"' : '';
+          return `
+            <label style="display:inline-flex;align-items:center;margin:2px 8px 2px 0;font-size:14px;">
+              <input type="checkbox" class="tag-checkbox" data-tag="${encodeURIComponent(tag)}" ${checked} ${indeterminate} style="margin-right:6px;">
+              <span>${tag}</span>
+            </label>
+          `;
+        }).join('');
+      }
+
       tagModal.innerHTML = `
         <div style="background:var(--background);color:var(--text);padding:30px 24px;border-radius:12px;min-width:320px;box-shadow:0 4px 24px rgba(0,0,0,0.2);">
           <h3 style="margin-top:0;">Add/Edit Tags</h3>
           <div style="margin-bottom:16px;">
-            <label style="font-size:15px;">Tags (comma separated):</label>
-            <input id="tag-input" type="text" style="width:100%;margin-top:6px;padding:8px;border-radius:6px;border:1px solid var(--secondary);background:var(--background);color:var(--text);" value="${currentTags.join(', ')}">
+            <label style="font-size:15px;">Tags:</label>
+            <div id="tag-checkbox-list" style="display:flex;flex-wrap:wrap;gap:6px 8px;margin:8px 0 8px 0;">
+              ${renderTagCheckboxes()}
+            </div>
+            <div style="display:flex;gap:8px;">
+              <input id="tag-input" type="text" style="flex:1;width:100%;padding:8px;border-radius:6px;border:1px solid var(--secondary);background:var(--background);color:var(--text);" placeholder="Add tag and press Enter">
+              <button id="tag-add-btn" style="padding:6px 14px;border-radius:6px;background:var(--primary);color:var(--background);border:none;cursor:pointer;font-weight:bold;">Add</button>
+            </div>
           </div>
           <div style="display:flex;gap:12px;justify-content:flex-end;">
             <button id="tag-cancel-btn" style="padding:6px 18px;border-radius:6px;background:var(--secondary);color:var(--text);border:none;cursor:pointer;">Cancel</button>
@@ -122,15 +156,75 @@
         </div>
       `;
       document.body.appendChild(tagModal);
+
+      function updateIndeterminate() {
+        document.querySelectorAll('.tag-checkbox').forEach(cb => {
+          const tag = decodeURIComponent(cb.dataset.tag);
+          cb.indeterminate = tagStates[tag] === 'indeterminate';
+        });
+      }
+      updateIndeterminate();
+
+      document.getElementById('tag-checkbox-list').addEventListener('change', e => {
+        if (e.target.classList.contains('tag-checkbox')) {
+          const tag = decodeURIComponent(e.target.dataset.tag);
+          tagStates[tag] = e.target.checked ? 'checked' : 'unchecked';
+          updateIndeterminate();
+        }
+      });
+
+      function addTagFromInput() {
+        const input = document.getElementById('tag-input');
+        let val = input.value.trim();
+        if (!val) return;
+        val.split(',').map(t => t.trim()).filter(Boolean).forEach(tag => {
+          if (!allTagList.includes(tag)) {
+            allTagList.push(tag);
+            tagStates[tag] = 'checked';
+          }
+        });
+        input.value = '';
+        document.getElementById('tag-checkbox-list').innerHTML = renderTagCheckboxes();
+        updateIndeterminate();
+      }
+      document.getElementById('tag-add-btn').onclick = addTagFromInput;
+      document.getElementById('tag-input').addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ',') {
+          e.preventDefault();
+          addTagFromInput();
+        }
+      });
+
       document.getElementById('tag-cancel-btn').onclick = () => tagModal.remove();
       document.getElementById('tag-save-btn').onclick = async () => {
-        const tags = document.getElementById('tag-input').value.split(',').map(t => t.trim()).filter(Boolean);
-        await onSave(tags);
+        if (images.length > 1) {
+          for (const img of images) {
+            let updatedTags = new Set(img.tags || []);
+            for (let tag of allTagList) {
+              if (tagStates[tag] === 'checked') {
+                updatedTags.add(tag);
+              } else if (tagStates[tag] === 'unchecked') {
+                updatedTags.delete(tag);
+              }
+            }
+            await fetch(`/api/images/${img.filename}/tags`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + getToken()
+              },
+              body: JSON.stringify({ tags: Array.from(updatedTags) })
+            });
+          }
+          await onSave();
+        } else {
+          const tags = allTagList.filter(tag => tagStates[tag] === 'checked');
+          await onSave(tags);
+        }
         tagModal.remove();
       };
     }
 
-    // --- Render Images with tags and tag edit button ---
     function renderImages(images, loggedIn) {
       const masonry = document.getElementById('masonry');
       masonry.innerHTML = '';
@@ -141,7 +235,6 @@
         div.className = 'masonry-item';
         div.style.position = 'relative';
 
-        // Checkbox for selection
         let checkboxHtml = '';
         if (loggedIn) {
           checkboxHtml = `
@@ -149,10 +242,18 @@
           `;
         }
 
-        // Tag display (bottom-left)
-        const tagHtml = tags.length
-          ? `<div class="image-tags" style="position:absolute;left:8px;bottom:8px;z-index:2;background:rgba(0,0,0,0.55);color:#fff;padding:2px 10px 2px 8px;border-radius:8px;font-size:13px;max-width:90%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity 0.2s;">${tags.map(t => `<span style="margin-right:7px;">${t}</span>`).join('')}</div>`
-          : `<div class="image-tags" style="position:absolute;left:8px;bottom:8px;z-index:2;background:rgba(0,0,0,0.55);color:#fff;padding:2px 10px 2px 8px;border-radius:8px;font-size:13px;max-width:90%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity 0.2s;"></div>`;
+        let tagHtml = '';
+        if (tags.length) {
+          tagHtml = `
+            <div class="image-tags" style="position:absolute;left:8px;bottom:8px;z-index:2;display:flex;flex-direction:column;align-items:flex-start;gap:4px;pointer-events:none;opacity:0;transition:opacity 0.2s;">
+              ${tags.map(t => `<div class="image-tag-box">${t}</div>`).join('')}
+            </div>
+          `;
+        } else {
+          tagHtml = `
+            <div class="image-tags" style="position:absolute;left:8px;bottom:8px;z-index:2;display:flex;flex-direction:column;align-items:flex-start;gap:4px;pointer-events:none;opacity:0;transition:opacity 0.2s;"></div>
+          `;
+        }
 
         div.innerHTML = `
           ${checkboxHtml}
@@ -160,7 +261,6 @@
           ${tagHtml}
         `;
 
-        // Show tags on hover
         const tagDiv = div.querySelector('.image-tags');
         div.addEventListener('mouseenter', () => {
           tagDiv.style.opacity = '1';
@@ -170,7 +270,6 @@
         });
 
         if (loggedIn) {
-          // Show checkbox on hover or if selected
           const checkbox = div.querySelector('.select-checkbox');
           if (selectedImages.has(filename)) {
             checkbox.checked = true;
@@ -199,7 +298,6 @@
         }
 
         if (loggedIn) {
-          // Delete button
           const btn = document.createElement('button');
           btn.innerHTML = '&times;';
           btn.className = 'delete-btn';
@@ -207,13 +305,13 @@
           btn.onclick = () => deleteImage(filename);
           div.appendChild(btn);
 
-          // Tag edit button (bottom-left, next to tags)
           const tagEditBtn = document.createElement('button');
           tagEditBtn.innerHTML = '🏷️';
           tagEditBtn.title = 'Edit tags';
+          tagEditBtn.className = 'tag-edit-btn';
           tagEditBtn.style.position = 'absolute';
-          tagEditBtn.style.left = '8px';
-          tagEditBtn.style.bottom = '38px';
+          tagEditBtn.style.right = '8px';
+          tagEditBtn.style.bottom = '8px';
           tagEditBtn.style.zIndex = 3;
           tagEditBtn.style.background = 'var(--primary)';
           tagEditBtn.style.color = 'var(--background)';
@@ -231,6 +329,7 @@
             showTagModal({
               filenames: [filename],
               currentTags: tags,
+              allTags: tags,
               onSave: async (newTags) => {
                 await fetch(`/api/images/${filename}/tags`, {
                   method: 'POST',
@@ -251,7 +350,6 @@
         imageElements.push(div.querySelector('img'));
       });
 
-      // Wait for all images to load before initializing Masonry
       Promise.all(
         imageElements.map(img => {
           if (img.complete) return Promise.resolve();
@@ -365,33 +463,23 @@
 
     document.getElementById('delete-selected-btn').onclick = deleteSelectedImages;
 
-    // --- Add tags to selected images ---
     document.getElementById('add-tags-selected-btn').onclick = async () => {
       if (selectedImages.size === 0) return;
-      // Get current tags for all selected images (intersection)
       const res = await fetch('/api/images');
       const images = await res.json();
       const selected = images.filter(img => selectedImages.has(img.filename));
-      let commonTags = [];
+      let allTags = [];
       if (selected.length > 0) {
-        // Find tags that are present in all selected images
-        commonTags = selected[0].tags;
-        for (let i = 1; i < selected.length; ++i) {
-          commonTags = commonTags.filter(tag => selected[i].tags.includes(tag));
-        }
+        const tagSet = new Set();
+        selected.forEach(img => (img.tags || []).forEach(tag => tagSet.add(tag)));
+        allTags = Array.from(tagSet);
       }
       showTagModal({
         filenames: Array.from(selectedImages),
-        currentTags: commonTags,
-        onSave: async (newTags) => {
-          await fetch('/api/images/bulk-tags', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer ' + getToken()
-            },
-            body: JSON.stringify({ filenames: Array.from(selectedImages), tags: newTags })
-          });
+        currentTags: [],
+        allTags,
+        images: selected,
+        onSave: async () => {
           loadImages();
         }
       });
@@ -434,7 +522,6 @@
     document.addEventListener("DOMContentLoaded", checkLogin);
   </script>
   <script>
-    // Theme logic
     let originalThemeValues = {};
 
     document.getElementById('theme-btn').addEventListener('click', () => {
@@ -679,7 +766,6 @@
       }
     }
 
-    // Make theme functions available globally for inline event handlers
     window.deleteTheme = deleteTheme;
     window.applyTheme = applyTheme;
     window.updateThemeName = updateThemeName;
