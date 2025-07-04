@@ -22,6 +22,10 @@
       <button type="submit">Upload Image(s)</button>
     </form>
   </div>
+  <div id="drag-drop-zone" style="display:none;margin-bottom:18px;padding:36px 0;border:2px dashed var(--primary);border-radius:12px;text-align:center;color:var(--primary);font-size:18px;transition:background 0.2s;">
+    <span>Drag &amp; drop images here to upload</span>
+    <input type="file" id="drag-zone-file-input" accept="image/*" multiple style="display:none;">
+  </div>
   <div id="delete-selected-section" style="display:none; margin-bottom: 15px;">
     <button id="delete-selected-btn" disabled>Delete Selected</button>
     <button id="add-tags-selected-btn" disabled>Add Tags to Selected</button>
@@ -429,6 +433,110 @@
       }
     };
 
+    const dragDropZone = document.getElementById('drag-drop-zone');
+    const uploadSection = document.getElementById('upload-section');
+    const dragZoneFileInput = document.getElementById('drag-zone-file-input');
+    let dragCounter = 0;
+
+    function showDropZone(show) {
+      dragDropZone.style.display = show ? '' : 'none';
+      if (!show) dragDropZone.classList.remove('dragover');
+    }
+
+    function isImageFile(file) {
+      return file.type.startsWith('image/');
+    }
+
+    dragDropZone.addEventListener('dragover', e => {
+      e.preventDefault();
+      dragDropZone.classList.add('dragover');
+    });
+    dragDropZone.addEventListener('dragleave', e => {
+      e.preventDefault();
+      dragDropZone.classList.remove('dragover');
+    });
+    dragDropZone.addEventListener('drop', async e => {
+      e.preventDefault();
+      dragDropZone.classList.remove('dragover');
+      showDropZone(false);
+      const files = Array.from(e.dataTransfer.files).filter(isImageFile);
+      if (!files.length) {
+        showDropZone(true);
+        return;
+      }
+      const formData = new FormData();
+      files.forEach(file => formData.append('image', file));
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + getToken() },
+        body: formData
+      });
+      if (res.ok) {
+        loadImages();
+      } else {
+        alert('Upload failed');
+      }
+      showDropZone(true);
+    });
+
+    dragDropZone.addEventListener('click', () => {
+      if (dragZoneFileInput) dragZoneFileInput.click();
+    });
+    dragZoneFileInput.addEventListener('change', async (e) => {
+      const files = Array.from(e.target.files).filter(isImageFile);
+      if (!files.length) return;
+      const formData = new FormData();
+      files.forEach(file => formData.append('image', file));
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + getToken() },
+        body: formData
+      });
+      if (res.ok) {
+        loadImages();
+      } else {
+        alert('Upload failed');
+      }
+      dragZoneFileInput.value = '';
+    });
+
+    function setAuthUI(loggedIn) {
+      document.getElementById('login-form').style.display = loggedIn ? 'none' : '';
+      document.getElementById('logout-btn').style.display = loggedIn ? '' : 'none';
+      document.getElementById('upload-section').style.display = loggedIn ? '' : 'none';
+      document.getElementById('delete-selected-section').style.display = loggedIn ? '' : 'none';
+      dragDropZone.style.display = loggedIn ? '' : 'none';
+      loggedInGlobal = loggedIn;
+      if (!loggedIn) {
+        selectedImages.clear();
+        updateDeleteSelectedBtn();
+        updateAddTagsSelectedBtn();
+      }
+    }
+
+    document.addEventListener('dragenter', e => {
+      if (!loggedInGlobal) return;
+      dragCounter++;
+      showDropZone(true);
+      dragDropZone.classList.add('dragover');
+    });
+    document.addEventListener('dragleave', e => {
+      if (!loggedInGlobal) return;
+      dragCounter--;
+      if (dragCounter <= 0) {
+        showDropZone(false);
+        dragCounter = 0;
+      }
+    });
+    document.addEventListener('dragover', e => {
+      if (!loggedInGlobal) return;
+      e.preventDefault();
+    });
+    document.addEventListener('drop', e => {
+      if (!loggedInGlobal) return;
+      dragCounter = 0;
+    });
+
     async function deleteImage(filename) {
       if (!confirm('Delete this image?')) return;
       const res = await fetch('/api/images/' + filename, {
@@ -494,6 +602,7 @@
       document.getElementById('logout-btn').style.display = loggedIn ? '' : 'none';
       document.getElementById('upload-section').style.display = loggedIn ? '' : 'none';
       document.getElementById('delete-selected-section').style.display = loggedIn ? '' : 'none';
+      dragDropZone.style.display = loggedIn ? '' : 'none';
       loggedInGlobal = loggedIn;
       if (!loggedIn) {
         selectedImages.clear();
