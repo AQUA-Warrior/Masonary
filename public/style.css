@@ -188,6 +188,7 @@
 .theme-item .delete-btn {
     background: var(--delete);
     color: var(--white);
+    display: none;
 }
 .theme-item .delete-btn:hover {
     background: #cc0000;
@@ -807,4 +808,98 @@ body::-webkit-scrollbar, html::-webkit-scrollbar {
 @media (max-width: 700px) {
   .image-modal-content { min-width: 0; padding: 10px 2vw 10px 2vw; }
   .image-modal-body img { max-width: 98vw; max-height: 32vh; }
+}
+
+.download-btn {
+  background: var(--primary);
+  color: var(--background);
+  border: none;
+  border-radius: var(--radius-round);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  font-size: 18px;
+  font-weight: bold;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  transition: background var(--transition);
+}
+.download-btn:hover {
+  background: var(--accent);
+  color: var(--background);
+}
+
+#download-selected-btn {
+  background: var(--primary);
+  color: var(--background);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-weight: bold;
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: var(--font-size-md);
+  padding: 6px 16px;
+  transition: background var(--transition), color var(--transition);
+  margin-left: 0;
+  margin-right: 0;
+}
+#download-selected-btn:disabled {
+  background: var(--secondary);
+  color: var(--text);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+#download-selected-btn:hover:enabled {
+  background: var(--accent);
+  color: var(--background);
+}
+
+#drag-zone-file-input {
+  display: none;
+}
+#drag-drop-zone label,
+#drag-drop-zone .choose-files-btn {
+  background: var(--primary);
+  color: var(--background);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-weight: bold;
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: var(--font-size-md);
+  padding: 6px 16px;
+  transition: background var(--transition), color var(--transition);
+  margin-left: 0;
+  margin-right: 0;
+  display: inline-block;
+}
+#drag-drop-zone label:hover,
+#drag-drop-zone .choose-files-btn:hover {
+  background: var(--accent);
+  color: var(--background);
+}
+
+.masonry-item .delete-btn,
+.masonry-item .download-btn {
+  display: none;
+}
+
+.masonry-item:hover .delete-btn,
+.masonry-item:hover .download-btn {
+  display: block;
+}
+
+.tag-modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 5000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }

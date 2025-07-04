@@ -29,6 +29,7 @@
   <div id="delete-selected-section" style="display:none; margin-bottom: 15px;">
     <button id="delete-selected-btn" disabled>Delete Selected</button>
     <button id="add-tags-selected-btn" disabled>Add Tags to Selected</button>
+    <button id="download-selected-btn" disabled>Download Selected</button>
   </div>
   <div class="masonry" id="masonry"></div>
 
@@ -123,16 +124,7 @@
     function showTagModal({ filenames, currentTags, allTags = [], onSave, images = [] }) {
       if (tagModal) tagModal.remove();
       tagModal = document.createElement('div');
-      tagModal.style.position = 'fixed';
-      tagModal.style.top = '0';
-      tagModal.style.left = '0';
-      tagModal.style.width = '100vw';
-      tagModal.style.height = '100vh';
-      tagModal.style.background = 'rgba(0,0,0,0.3)';
-      tagModal.style.display = 'flex';
-      tagModal.style.alignItems = 'center';
-      tagModal.style.justifyContent = 'center';
-      tagModal.style.zIndex = 2000;
+      tagModal.className = 'tag-modal-overlay';
 
       let tagSets = images.length ? images.map(img => new Set(img.tags || [])) : [new Set(allTags)];
       let allTagList = images.length
@@ -398,6 +390,7 @@
             }
             updateDeleteSelectedBtn();
             updateAddTagsSelectedBtn();
+            updateDownloadSelectedBtn();
           });
         }
 
@@ -408,6 +401,30 @@
           btn.title = 'Delete';
           btn.onclick = () => deleteImage(filename);
           div.appendChild(btn);
+
+          const downloadBtn = document.createElement('button');
+          downloadBtn.innerHTML = '⬇️';
+          downloadBtn.title = 'Download';
+          downloadBtn.className = 'download-btn';
+          downloadBtn.style.position = 'absolute';
+          downloadBtn.style.top = '8px';
+          downloadBtn.style.right = '48px';
+          downloadBtn.style.zIndex = 3;
+          downloadBtn.style.background = 'var(--primary)';
+          downloadBtn.style.color = 'var(--background)';
+          downloadBtn.style.border = 'none';
+          downloadBtn.style.borderRadius = '50%';
+          downloadBtn.style.width = '32px';
+          downloadBtn.style.height = '32px';
+          downloadBtn.style.fontSize = '18px';
+          downloadBtn.style.cursor = 'pointer';
+          downloadBtn.style.boxShadow = '0 2px 8px rgba(0,0,0,0.12)';
+          downloadBtn.style.transition = 'background var(--transition)';
+          downloadBtn.onclick = (e) => {
+            e.stopPropagation();
+            downloadImages([filename]);
+          };
+          div.appendChild(downloadBtn);
 
           const tagEditBtn = document.createElement('button');
           tagEditBtn.innerHTML = '🏷️';
@@ -490,6 +507,10 @@
     }
     function updateAddTagsSelectedBtn() {
       const btn = document.getElementById('add-tags-selected-btn');
+      btn.disabled = selectedImages.size === 0;
+    }
+    function updateDownloadSelectedBtn() {
+      const btn = document.getElementById('download-selected-btn');
       btn.disabled = selectedImages.size === 0;
     }
 
@@ -623,6 +644,9 @@
         selectedImages.clear();
         updateDeleteSelectedBtn();
         updateAddTagsSelectedBtn();
+        updateDownloadSelectedBtn();
+      } else {
+        updateDownloadSelectedBtn();
       }
     }
 
@@ -705,6 +729,36 @@
       });
     };
 
+    async function downloadImages(filenames) {
+      if (!Array.isArray(filenames) || filenames.length === 0) return;
+      const isSingle = filenames.length === 1;
+      const res = await fetch('/api/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filenames })
+      });
+      if (!res.ok) {
+        alert('Download failed');
+        return;
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = isSingle ? filenames[0] : 'images.zip';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        a.remove();
+      }, 100);
+    }
+
+    document.getElementById('download-selected-btn').onclick = () => {
+      if (selectedImages.size === 0) return;
+      downloadImages(Array.from(selectedImages));
+    };
+
     function getToken() {
       return localStorage.getItem('token');
     }
@@ -720,6 +774,7 @@
         selectedImages.clear();
         updateDeleteSelectedBtn();
         updateAddTagsSelectedBtn();
+        updateDownloadSelectedBtn();
       }
     }
 

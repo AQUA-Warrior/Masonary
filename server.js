@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
+const archiver = require('archiver');
 
 const app = express();
 const port = 3000;
@@ -245,6 +246,32 @@ app.get('/api/images-meta/:filename', (req, res) => {
     if (err) return res.status(404).json({ error: 'File not found' });
     res.json({ uploaded: stat.birthtime || stat.ctime });
   });
+});
+
+app.post('/api/download', (req, res) => {
+  const { filenames } = req.body;
+  if (!Array.isArray(filenames) || filenames.length === 0) {
+    return res.status(400).json({ error: 'No filenames provided' });
+  }
+  if (filenames.length === 1) {
+    const filePath = path.join(uploadsDir, filenames[0]);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+    res.download(filePath, filenames[0]);
+  } else {
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', 'attachment; filename=images.zip');
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.pipe(res);
+    filenames.forEach(filename => {
+      const filePath = path.join(uploadsDir, filename);
+      if (fs.existsSync(filePath)) {
+        archive.file(filePath, { name: filename });
+      }
+    });
+    archive.finalize();
+  }
 });
 
 app.listen(port, () => {
