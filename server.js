@@ -60,8 +60,16 @@ db.serialize(() => {
   )`);
   db.run(`CREATE TABLE IF NOT EXISTS image_tags (
     filename TEXT PRIMARY KEY,
-    tags TEXT DEFAULT '[]'
+    tags TEXT DEFAULT '[]',
+    description TEXT DEFAULT ''
   )`);
+  db.get("PRAGMA table_info(image_tags)", (err, row) => {
+    db.all("PRAGMA table_info(image_tags)", (err, columns) => {
+      if (!columns.some(col => col.name === "description")) {
+        db.run("ALTER TABLE image_tags ADD COLUMN description TEXT DEFAULT ''");
+      }
+    });
+  });
 });
 
 function authenticateToken(req, res, next) {
@@ -248,8 +256,31 @@ app.get('/api/images-meta/:filename', (req, res) => {
   const filePath = path.join(uploadsDir, req.params.filename);
   fs.stat(filePath, (err, stat) => {
     if (err) return res.status(404).json({ error: 'File not found' });
-    res.json({ uploaded: stat.birthtime || stat.ctime });
+    db.get(
+      'SELECT description FROM image_tags WHERE filename = ?',
+      [req.params.filename],
+      (dbErr, row) => {
+        res.json({
+          uploaded: stat.birthtime || stat.ctime,
+          description: row && row.description ? row.description : ''
+        });
+      }
+    );
   });
+});
+
+app.post('/api/images/:filename/description', authenticateToken, (req, res) => {
+  const filename = req.params.filename;
+  const { description } = req.body;
+  db.run(
+    `INSERT INTO image_tags (filename, description) VALUES (?, ?)
+     ON CONFLICT(filename) DO UPDATE SET description=excluded.description`,
+    [filename, description || ''],
+    function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true });
+    }
+  );
 });
 
 app.post('/api/download', (req, res) => {

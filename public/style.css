@@ -742,8 +742,8 @@ body::-webkit-scrollbar, html::-webkit-scrollbar {
   gap: 22px;
 }
 .image-modal-body img {
-  max-width: 520px;
-  max-height: 56vh;
+  max-width: 420px;
+  max-height: 40vh;
   border-radius: 14px;
   box-shadow: 0 4px 24px rgba(0,0,0,0.22);
   margin-bottom: 12px;
@@ -781,6 +781,11 @@ body::-webkit-scrollbar, html::-webkit-scrollbar {
   margin-top: 12px;
   justify-content: flex-end;
   width: 100%;
+  position: sticky;
+  bottom: 0;
+  background: rgba(10,15,16,0.92);
+  padding-bottom: 8px;
+  z-index: 2;
 }
 .modal-action-btn {
   background: var(--primary);
@@ -803,11 +808,11 @@ body::-webkit-scrollbar, html::-webkit-scrollbar {
 }
 @media (max-width: 900px) {
   .image-modal-content { min-width: 0; max-width: 98vw; padding: 18px 2vw 18px 2vw; }
-  .image-modal_body img { max-width: 90vw; max-height: 40vh; }
+  .image-modal_body img { max-width: 80vw; max-height: 28vh; }
 }
 @media (max-width: 700px) {
   .image-modal-content { min-width: 0; padding: 10px 2vw 10px 2vw; }
-  .image-modal-body img { max-width: 98vw; max-height: 32vh; }
+  .image-modal-body img { max-width: 96vw; max-height: 18vh; }
 }
 
 .download-btn {
@@ -924,4 +929,36 @@ body::-webkit-scrollbar, html::-webkit-scrollbar {
 .sort-select option {
   background: var(--background);
   color: var(--text);
+}
+
+#modal-desc-edit-section {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin: 10px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+#modal-desc-input {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 90px;
+  max-height: 220px;
+  border-radius: 10px;
+  padding: 0px 14px;
+  font-size: 16px;
+  background: var(--background);
+  color: var(--text);
+  border: 1.5px solid var(--secondary);
+  resize: vertical;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  transition: border 0.2s, background 0.2s, color 0.2s;
+  margin-bottom: 6px;
+  display: block;
+  margin-left: 0;
+  margin-right: 0;
+  box-sizing: border-box;
 }

@@ -57,13 +57,24 @@
           <div><b>Uploaded:</b> <span id="modal-date"></span></div>
           <div><b>Tags:</b>
             <span id="modal-tags"></span>
-            <button id="modal-edit-tags-btn" class="modal-action-btn" style="display:none;">🏷️ Edit Tags</button>
+          </div>
+          <div><b>Description:</b>
+            <span id="modal-description"></span>
           </div>
         </div>
-        <div class="image-modal-actions">
-          <a id="modal-download-btn" class="modal-action-btn" download target="_blank">Download</a>
-          <button id="modal-delete-btn" class="modal-action-btn" style="display:none;">❌ Delete</button>
+        <div id="modal-desc-edit-section" style="display:none;">
+          <textarea id="modal-desc-input" rows="3"></textarea>
+          <div style="margin-top:6px;display:flex;gap:10px;justify-content:flex-end;">
+            <button id="modal-desc-cancel-btn" class="modal-action-btn" style="background:var(--secondary);color:var(--text);">Cancel</button>
+            <button id="modal-desc-save-btn" class="modal-action-btn" style="font-weight:bold;">Save</button>
+          </div>
         </div>
+      </div>
+      <div class="image-modal-actions" style="position:sticky;bottom:0;background:rgba(10,15,16,0.92);padding-bottom:8px;z-index:2;">
+        <button id="modal-edit-tags-btn" class="modal-action-btn" style="display:none;">Edit Tags</button>
+        <button id="modal-edit-desc-btn" class="modal-action-btn" style="display:none;">Edit Description</button>
+        <a id="modal-download-btn" class="modal-action-btn" download target="_blank">Download</a>
+        <button id="modal-delete-btn" class="modal-action-btn" style="display:none;">Delete</button>
       </div>
     </div>
   </div>
@@ -270,6 +281,12 @@
     const modalDownloadBtn = document.getElementById('modal-download-btn');
     const modalDeleteBtn = document.getElementById('modal-delete-btn');
     const modalEditTagsBtn = document.getElementById('modal-edit-tags-btn');
+    const modalDescription = document.getElementById('modal-description');
+    const modalEditDescBtn = document.getElementById('modal-edit-desc-btn');
+    const modalDescEditSection = document.getElementById('modal-desc-edit-section');
+    const modalDescInput = document.getElementById('modal-desc-input');
+    const modalDescCancelBtn = document.getElementById('modal-desc-cancel-btn');
+    const modalDescSaveBtn = document.getElementById('modal-desc-save-btn');
     let modalImageObj = null;
 
     function showImageModal(imgObj, loggedIn) {
@@ -291,7 +308,11 @@
       modalDownloadBtn.href = imgObj.url;
       modalDownloadBtn.download = imgObj.filename;
       modalEditTagsBtn.style.display = loggedIn ? '' : 'none';
+      modalEditDescBtn.style.display = loggedIn ? '' : 'none';
       modalDeleteBtn.style.display = loggedIn ? '' : 'none';
+      modalDescription.textContent = (imgObj.description && imgObj.description.trim()) ? imgObj.description : '(none)';
+      modalDescription.style.display = '';
+      modalDescEditSection.style.display = 'none';
       imageModal.classList.remove('hidden');
     }
 
@@ -327,11 +348,31 @@
       });
     };
 
-    modalDeleteBtn.onclick = async () => {
+    modalEditDescBtn.onclick = () => {
       if (!modalImageObj) return;
-      if (!confirm('Delete this image?')) return;
-      await deleteImage(modalImageObj.filename);
+      modalDescInput.value = modalImageObj.description || '';
+      modalDescEditSection.style.display = '';
+      modalEditDescBtn.style.display = 'none';
+      modalDescription.style.display = 'none';
+    };
+    modalDescCancelBtn.onclick = () => {
+      modalDescEditSection.style.display = 'none';
+      modalEditDescBtn.style.display = '';
+      modalDescription.style.display = '';
+    };
+    modalDescSaveBtn.onclick = async () => {
+      if (!modalImageObj) return;
+      const newDesc = modalDescInput.value.trim();
+      await fetch(`/api/images/${modalImageObj.filename}/description`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + getToken()
+        },
+        body: JSON.stringify({ description: newDesc })
+      });
       hideImageModal();
+      loadImages();
     };
 
     let sortOption = 'date_desc';
@@ -575,14 +616,16 @@
 
         div.querySelector('img').onclick = async (e) => {
           let uploaded = '';
+          let description = '';
           try {
             const res = await fetch(`/api/images-meta/${encodeURIComponent(filename)}`);
             if (res.ok) {
               const meta = await res.json();
               uploaded = meta.uploaded;
+              description = meta.description || '';
             }
           } catch {}
-          showImageModal({ ...imgObj, uploaded }, loggedIn);
+          showImageModal({ ...imgObj, uploaded, description }, loggedIn);
         };
 
         masonry.appendChild(div);
