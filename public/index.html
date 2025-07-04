@@ -32,6 +32,28 @@
   </div>
   <div class="masonry" id="masonry"></div>
 
+  <div id="image-modal" class="image-modal hidden">
+    <div class="image-modal-backdrop"></div>
+    <div class="image-modal-content">
+      <button class="image-modal-close" title="Close">&times;</button>
+      <div class="image-modal-body">
+        <img id="modal-image" src="" alt="Preview">
+        <div class="image-modal-meta">
+          <div><b>Filename:</b> <span id="modal-filename"></span></div>
+          <div><b>Uploaded:</b> <span id="modal-date"></span></div>
+          <div><b>Tags:</b>
+            <span id="modal-tags"></span>
+            <button id="modal-edit-tags-btn" class="modal-action-btn" style="display:none;">🏷️ Edit Tags</button>
+          </div>
+        </div>
+        <div class="image-modal-actions">
+          <a id="modal-download-btn" class="modal-action-btn" download target="_blank">Download</a>
+          <button id="modal-delete-btn" class="modal-action-btn" style="display:none;">❌ Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="theme-manager" class="theme-manager">
     <button id="theme-btn" class="theme-btn">🎨</button>
     <div id="theme-popup" class="theme-popup hidden">
@@ -229,6 +251,84 @@
       };
     }
 
+    function formatDate(date) {
+      if (!date) return '';
+      const d = new Date(date);
+      return d.toLocaleString();
+    }
+
+    const imageModal = document.getElementById('image-modal');
+    const modalImage = document.getElementById('modal-image');
+    const modalFilename = document.getElementById('modal-filename');
+    const modalDate = document.getElementById('modal-date');
+    const modalTags = document.getElementById('modal-tags');
+    const modalDownloadBtn = document.getElementById('modal-download-btn');
+    const modalDeleteBtn = document.getElementById('modal-delete-btn');
+    const modalEditTagsBtn = document.getElementById('modal-edit-tags-btn');
+    let modalImageObj = null;
+
+    function showImageModal(imgObj, loggedIn) {
+      modalImageObj = imgObj;
+      modalImage.src = imgObj.url;
+      modalFilename.textContent = imgObj.filename;
+      modalDate.textContent = imgObj.uploaded ? formatDate(imgObj.uploaded) : '';
+      modalTags.innerHTML = '';
+      if (imgObj.tags && imgObj.tags.length) {
+        imgObj.tags.forEach(tag => {
+          const tagEl = document.createElement('span');
+          tagEl.className = 'image-tag-box';
+          tagEl.textContent = tag;
+          modalTags.appendChild(tagEl);
+        });
+      } else {
+        modalTags.textContent = '(none)';
+      }
+      modalDownloadBtn.href = imgObj.url;
+      modalDownloadBtn.download = imgObj.filename;
+      modalEditTagsBtn.style.display = loggedIn ? '' : 'none';
+      modalDeleteBtn.style.display = loggedIn ? '' : 'none';
+      imageModal.classList.remove('hidden');
+    }
+
+    function hideImageModal() {
+      imageModal.classList.add('hidden');
+      modalImageObj = null;
+    }
+
+    document.querySelector('.image-modal-close').onclick = hideImageModal;
+    document.querySelector('.image-modal-backdrop').onclick = hideImageModal;
+    document.addEventListener('keydown', e => {
+      if (!imageModal.classList.contains('hidden') && e.key === 'Escape') hideImageModal();
+    });
+
+    modalEditTagsBtn.onclick = () => {
+      if (!modalImageObj) return;
+      showTagModal({
+        filenames: [modalImageObj.filename],
+        currentTags: modalImageObj.tags,
+        allTags: modalImageObj.tags,
+        onSave: async (newTags) => {
+          await fetch(`/api/images/${modalImageObj.filename}/tags`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + getToken()
+            },
+            body: JSON.stringify({ tags: newTags })
+          });
+          hideImageModal();
+          loadImages();
+        }
+      });
+    };
+
+    modalDeleteBtn.onclick = async () => {
+      if (!modalImageObj) return;
+      if (!confirm('Delete this image?')) return;
+      await deleteImage(modalImageObj.filename);
+      hideImageModal();
+    };
+
     function renderImages(images, loggedIn) {
       const masonry = document.getElementById('masonry');
       masonry.innerHTML = '';
@@ -349,6 +449,18 @@
           };
           div.appendChild(tagEditBtn);
         }
+
+        div.querySelector('img').onclick = async (e) => {
+          let uploaded = '';
+          try {
+            const res = await fetch(`/api/images-meta/${encodeURIComponent(filename)}`);
+            if (res.ok) {
+              const meta = await res.json();
+              uploaded = meta.uploaded;
+            }
+          } catch {}
+          showImageModal({ ...imgObj, uploaded }, loggedIn);
+        };
 
         masonry.appendChild(div);
         imageElements.push(div.querySelector('img'));

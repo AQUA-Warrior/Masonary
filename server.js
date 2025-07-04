@@ -239,6 +239,14 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+app.get('/api/images-meta/:filename', (req, res) => {
+  const filePath = path.join(uploadsDir, req.params.filename);
+  fs.stat(filePath, (err, stat) => {
+    if (err) return res.status(404).json({ error: 'File not found' });
+    res.json({ uploaded: stat.birthtime || stat.ctime });
+  });
+});
+
 app.listen(port, () => {
   console.log(`Server is running at http://localhost:${port}`);
 });
