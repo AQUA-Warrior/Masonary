@@ -903,3 +903,25 @@ body::-webkit-scrollbar, html::-webkit-scrollbar {
   align-items: center !important;
   justify-content: center !important;
 }
+
+.sort-select {
+  background: var(--background);
+  color: var(--text);
+  border: 1.5px solid var(--secondary);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  font-size: var(--font-size-md);
+  font-family: var(--font-family);
+  margin-left: 8px;
+  transition: border var(--transition), background var(--transition), color var(--transition);
+  outline: none;
+}
+.sort-select:focus {
+  border-color: var(--accent);
+  background: var(--background);
+  color: var(--text);
+}
+.sort-select option {
+  background: var(--background);
+  color: var(--text);
+}

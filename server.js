@@ -97,12 +97,7 @@ app.get('/api/images', (req, res) => {
   fs.readdir(uploadsDir, (err, files) => {
     if (err) return res.json([]);
     const images = files
-      .filter(f => /\.(jpg|jpeg|png|gif)$/i.test(f))
-      .sort((a, b) => {
-        const aTime = fs.statSync(path.join(uploadsDir, a)).ctimeMs;
-        const bTime = fs.statSync(path.join(uploadsDir, b)).ctimeMs;
-        return bTime - aTime;
-      });
+      .filter(f => /\.(jpg|jpeg|png|gif)$/i.test(f));
     if (images.length === 0) return res.json([]);
     db.all(
       `SELECT filename, tags FROM image_tags WHERE filename IN (${images.map(() => '?').join(',')})`,
@@ -118,11 +113,20 @@ app.get('/api/images', (req, res) => {
             }
           });
         }
-        const result = images.map(f => ({
-          url: `/uploads/${f}`,
-          filename: f,
-          tags: tagMap[f] || []
-        }));
+        const result = images.map(f => {
+          let stat;
+          try {
+            stat = fs.statSync(path.join(uploadsDir, f));
+          } catch {
+            stat = {};
+          }
+          return {
+            url: `/uploads/${f}`,
+            filename: f,
+            tags: tagMap[f] || [],
+            uploaded: stat.ctimeMs || 0
+          };
+        });
         res.json(result);
       }
     );

@@ -31,6 +31,19 @@
     <button id="add-tags-selected-btn" disabled>Add Tags to Selected</button>
     <button id="download-selected-btn" disabled>Download Selected</button>
   </div>
+  <div id="gallery-controls" style="display:flex;align-items:center;gap:18px;margin-bottom:18px;">
+    <div>
+      <label for="sort-select" style="font-weight:bold;">Sort by:</label>
+      <select id="sort-select" class="sort-select">
+        <option value="date_desc">Date (Newest)</option>
+        <option value="date_asc">Date (Oldest)</option>
+        <option value="name_asc">Name (A-Z)</option>
+        <option value="name_desc">Name (Z-A)</option>
+        <option value="tag_asc">Tag (A-Z)</option>
+        <option value="tag_desc">Tag (Z-A)</option>
+      </select>
+    </div>
+  </div>
   <div class="masonry" id="masonry"></div>
 
   <div id="image-modal" class="image-modal hidden">
@@ -321,9 +334,102 @@
       hideImageModal();
     };
 
-    function renderImages(images, loggedIn) {
+    let sortOption = 'date_desc';
+    let allImages = [];
+    let loadedCount = 0;
+    const pageSize = 30;
+    let loadingImages = false;
+
+    document.getElementById('sort-select').addEventListener('change', function() {
+      sortOption = this.value;
+      loadedCount = 0;
+      document.getElementById('masonry').innerHTML = '';
+      renderImagesWithInfiniteScroll(true);
+    });
+
+    function sortImages(images, option) {
+      let sorted = [...images];
+      switch (option) {
+        case 'date_desc':
+          sorted.sort((a, b) => (b.uploaded || 0) - (a.uploaded || 0));
+          break;
+        case 'date_asc':
+          sorted.sort((a, b) => (a.uploaded || 0) - (b.uploaded || 0));
+          break;
+        case 'name_asc':
+          sorted.sort((a, b) => a.filename.localeCompare(b.filename));
+          break;
+        case 'name_desc':
+          sorted.sort((a, b) => b.filename.localeCompare(a.filename));
+          break;
+        case 'tag_asc':
+          sorted.sort((a, b) => {
+            const ta = (a.tags && a.tags[0]) || '';
+            const tb = (b.tags && b.tags[0]) || '';
+            return ta.localeCompare(tb);
+          });
+          break;
+        case 'tag_desc':
+          sorted.sort((a, b) => {
+            const ta = (a.tags && a.tags[0]) || '';
+            const tb = (b.tags && b.tags[0]) || '';
+            return tb.localeCompare(ta);
+          });
+          break;
+      }
+      return sorted;
+    }
+
+    async function loadImages() {
+      const res = await fetch('/api/images');
+      let images = await res.json();
+      await Promise.all(images.map(async img => {
+        try {
+          const metaRes = await fetch(`/api/images-meta/${encodeURIComponent(img.filename)}`);
+          if (metaRes.ok) {
+            const meta = await metaRes.json();
+            img.uploaded = new Date(meta.uploaded).getTime();
+          }
+        } catch {}
+      }));
+      allImages = images;
+      loadedCount = 0;
+      document.getElementById('masonry').innerHTML = '';
+      renderImagesWithInfiniteScroll(true);
+    }
+
+    function renderImagesWithInfiniteScroll(reset = false) {
+      if (loadingImages) return;
+      loadingImages = true;
+      const sorted = sortImages(allImages, sortOption);
       const masonry = document.getElementById('masonry');
-      masonry.innerHTML = '';
+      let start = loadedCount;
+      let end = Math.min(loadedCount + pageSize, sorted.length);
+      const imagesToRender = sorted.slice(start, end);
+      loadedCount = end;
+      if (reset) {
+        masonry.innerHTML = '';
+        loadedCount = imagesToRender.length;
+      }
+      renderImages(imagesToRender, loggedInGlobal, masonry, reset);
+      loadingImages = false;
+    }
+
+    window.addEventListener('scroll', () => {
+      if (loadingImages) return;
+      const masonry = document.getElementById('masonry');
+      if (
+        window.innerHeight + window.scrollY >=
+        (masonry.offsetTop + masonry.offsetHeight - 300)
+      ) {
+        if (loadedCount < allImages.length) {
+          renderImagesWithInfiniteScroll();
+        }
+      }
+    });
+
+    function renderImages(images, loggedIn, masonryOverride = null, reset = false) {
+      const masonry = masonryOverride || document.getElementById('masonry');
       const imageElements = [];
       images.forEach(imgObj => {
         const { url, filename, tags } = imgObj;
@@ -516,8 +622,20 @@
 
     async function loadImages() {
       const res = await fetch('/api/images');
-      const images = await res.json();
-      renderImages(images, loggedInGlobal);
+      let images = await res.json();
+      await Promise.all(images.map(async img => {
+        try {
+          const metaRes = await fetch(`/api/images-meta/${encodeURIComponent(img.filename)}`);
+          if (metaRes.ok) {
+            const meta = await metaRes.json();
+            img.uploaded = new Date(meta.uploaded).getTime();
+          }
+        } catch {}
+      }));
+      allImages = images;
+      loadedCount = 0;
+      document.getElementById('masonry').innerHTML = '';
+      renderImagesWithInfiniteScroll(true);
     }
 
     document.getElementById('login-form').onsubmit = async e => {
