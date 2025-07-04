@@ -783,7 +783,7 @@ body::-webkit-scrollbar, html::-webkit-scrollbar {
   width: 100%;
   position: sticky;
   bottom: 0;
-  background: rgba(10,15,16,0.92);
+  background: transparent;
   padding-bottom: 8px;
   z-index: 2;
 }
