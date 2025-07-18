@@ -61,14 +61,16 @@ db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS image_tags (
     filename TEXT PRIMARY KEY,
     tags TEXT DEFAULT '[]',
-    description TEXT DEFAULT ''
+    description TEXT DEFAULT '',
+    favorite INTEGER DEFAULT 0
   )`);
-  db.get("PRAGMA table_info(image_tags)", (err, row) => {
-    db.all("PRAGMA table_info(image_tags)", (err, columns) => {
-      if (!columns.some(col => col.name === "description")) {
-        db.run("ALTER TABLE image_tags ADD COLUMN description TEXT DEFAULT ''");
-      }
-    });
+  db.all("PRAGMA table_info(image_tags)", (err, columns) => {
+    if (!columns.some(col => col.name === "description")) {
+      db.run("ALTER TABLE image_tags ADD COLUMN description TEXT DEFAULT ''");
+    }
+    if (!columns.some(col => col.name === "favorite")) {
+      db.run("ALTER TABLE image_tags ADD COLUMN favorite INTEGER DEFAULT 0");
+    }
   });
 });
 
@@ -108,10 +110,11 @@ app.get('/api/images', (req, res) => {
       .filter(f => /\.(jpg|jpeg|png|gif)$/i.test(f));
     if (images.length === 0) return res.json([]);
     db.all(
-      `SELECT filename, tags FROM image_tags WHERE filename IN (${images.map(() => '?').join(',')})`,
+      `SELECT filename, tags, favorite FROM image_tags WHERE filename IN (${images.map(() => '?').join(',')})`,
       images,
       (err, rows) => {
         const tagMap = {};
+        const favMap = {};
         if (rows) {
           rows.forEach(row => {
             try {
@@ -119,6 +122,7 @@ app.get('/api/images', (req, res) => {
             } catch {
               tagMap[row.filename] = [];
             }
+            favMap[row.filename] = row.favorite === 1;
           });
         }
         const result = images.map(f => {
@@ -132,7 +136,8 @@ app.get('/api/images', (req, res) => {
             url: `/uploads/${f}`,
             filename: f,
             tags: tagMap[f] || [],
-            uploaded: stat.ctimeMs || 0
+            uploaded: stat.ctimeMs || 0,
+            favorite: favMap[f] || false
           };
         });
         res.json(result);
@@ -339,6 +344,50 @@ app.post('/api/themes/import', (req, res) => {
         res.json({ id: this.lastID });
       }
     );
+  });
+});
+
+app.post('/api/images/:filename/favorite', authenticateToken, (req, res) => {
+  const filename = req.params.filename;
+  db.run(
+    `INSERT INTO image_tags (filename, favorite) VALUES (?, 1)
+     ON CONFLICT(filename) DO UPDATE SET favorite=1`,
+    [filename],
+    function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true });
+    }
+  );
+});
+
+app.post('/api/images/:filename/unfavorite', authenticateToken, (req, res) => {
+  const filename = req.params.filename;
+  db.run(
+    `INSERT INTO image_tags (filename, favorite) VALUES (?, 0)
+     ON CONFLICT(filename) DO UPDATE SET favorite=0`,
+    [filename],
+    function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true });
+    }
+  );
+});
+
+app.post('/api/images/bulk-favorite', authenticateToken, (req, res) => {
+  const { filenames, favorite } = req.body;
+  if (!Array.isArray(filenames) || typeof favorite !== 'boolean') {
+    return res.status(400).json({ error: 'filenames must be array, favorite must be boolean' });
+  }
+  const stmt = db.prepare(
+    `INSERT INTO image_tags (filename, favorite) VALUES (?, ?)
+     ON CONFLICT(filename) DO UPDATE SET favorite=excluded.favorite`
+  );
+  for (const filename of filenames) {
+    stmt.run(filename, favorite ? 1 : 0);
+  }
+  stmt.finalize(err => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
   });
 });
 

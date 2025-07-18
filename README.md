@@ -7,6 +7,8 @@
 - Select and delete single or multiple images
 - Protected upload/delete endpoints
 - Search/filter images by tag or filename
+- Import/Export themes as JSON Files
+- Mark images as favorites/starred and filter by favorites
 
 ### Prerequisites
 
@@ -40,3 +42,6 @@
 - `GET /api/images` - List all images
 - `POST /api/upload` - Upload images (auth required)
 - `DELETE /api/images/:filename` - Delete image (auth required)
+- `POST /api/images/:filename/favorite` - Mark image as favorite (auth required)
+- `POST /api/images/:filename/unfavorite` - Unmark image as favorite (auth required)
+- `POST /api/images/bulk-favorite` - Bulk mark/unmark images as favorite (auth required)

@@ -53,6 +53,12 @@
     <div>
       <input id="image-search-input" type="text" placeholder="Search by tag or filename..." style="padding:6px 12px;border-radius:6px;border:1.5px solid var(--secondary);background:var(--background);color:var(--text);font-size:var(--font-size-md);width:220px;">
     </div>
+    <div>
+      <label style="font-weight:bold;cursor:pointer;">
+        <input type="checkbox" id="favorites-only-checkbox" style="vertical-align:middle;margin-right:6px;">
+        Show Favorites Only
+      </label>
+    </div>
   </div>
   <div class="masonry" id="masonry"></div>
 
@@ -396,6 +402,7 @@
     const pageSize = 30;
     let loadingImages = false;
     let searchQuery = '';
+    let favoritesOnly = false;
 
     document.getElementById('sort-select').addEventListener('change', function() {
       sortOption = this.value;
@@ -406,6 +413,13 @@
 
     document.getElementById('image-search-input').addEventListener('input', function() {
       searchQuery = this.value.trim().toLowerCase();
+      loadedCount = 0;
+      document.getElementById('masonry').innerHTML = '';
+      renderImagesWithInfiniteScroll(true);
+    });
+
+    document.getElementById('favorites-only-checkbox').addEventListener('change', function() {
+      favoritesOnly = this.checked;
       loadedCount = 0;
       document.getElementById('masonry').innerHTML = '';
       renderImagesWithInfiniteScroll(true);
@@ -445,15 +459,45 @@
     }
 
     function filterImages(images, query) {
-      if (!query) return images;
-      return images.filter(img => {
+      let filtered = images;
+      if (favoritesOnly) {
+        filtered = filtered.filter(img => img.favorite);
+      }
+      if (!query) return filtered;
+      return filtered.filter(img => {
         const nameMatch = img.filename.toLowerCase().includes(query);
         const tagsMatch = (img.tags || []).some(tag => tag.toLowerCase().includes(query));
         return nameMatch || tagsMatch;
       });
     }
 
-    async function loadImages() {
+    async function setFavorite(filename, value) {
+      const imgObj = allImages.find(img => img.filename === filename);
+      if (!imgObj) return;
+      imgObj.favorite = value;
+      const masonry = document.getElementById('masonry');
+      const item = Array.from(masonry.getElementsByClassName('masonry-item')).find(div => {
+        const img = div.querySelector('img');
+        return img && img.src.includes(encodeURIComponent(filename));
+      });
+      if (item) {
+        const favBtn = item.querySelector('.favorite-btn');
+        if (favBtn) {
+          favBtn.innerHTML = value ? '★' : '☆';
+          favBtn.title = value ? 'Unstar' : 'Star';
+          favBtn.style.color = value ? 'gold' : 'var(--secondary)';
+        }
+        if (favoritesOnly && !value) {
+          item.remove();
+        }
+      }
+      await fetch(`/api/images/${encodeURIComponent(filename)}/${value ? 'favorite' : 'unfavorite'}`, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+      });
+    }
+
+    async function loadImages(restoreScrollY = null) {
       const res = await fetch('/api/images');
       let images = await res.json();
       await Promise.all(images.map(async img => {
@@ -468,10 +512,10 @@
       allImages = images;
       loadedCount = 0;
       document.getElementById('masonry').innerHTML = '';
-      renderImagesWithInfiniteScroll(true);
+      renderImagesWithInfiniteScroll(true, restoreScrollY);
     }
 
-    function renderImagesWithInfiniteScroll(reset = false) {
+    function renderImagesWithInfiniteScroll(reset = false, restoreScrollY = null) {
       if (loadingImages) return;
       loadingImages = true;
       let filtered = filterImages(allImages, searchQuery);
@@ -487,6 +531,9 @@
       }
       renderImages(imagesToRender, loggedInGlobal, masonry, reset);
       loadingImages = false;
+      if (restoreScrollY !== null) {
+        window.scrollTo({ top: restoreScrollY, behavior: 'auto' });
+      }
     }
 
     window.addEventListener('scroll', () => {
@@ -506,7 +553,7 @@
       const masonry = masonryOverride || document.getElementById('masonry');
       const imageElements = [];
       images.forEach(imgObj => {
-        const { url, filename, tags } = imgObj;
+        const { url, filename, tags, favorite } = imgObj;
         const div = document.createElement('div');
         div.className = 'masonry-item';
         div.style.position = 'relative';
@@ -645,6 +692,32 @@
             });
           };
           div.appendChild(tagEditBtn);
+
+          const favBtn = document.createElement('button');
+          favBtn.className = 'favorite-btn';
+          favBtn.title = favorite ? 'Unstar' : 'Star';
+          favBtn.innerHTML = favorite ? '★' : '☆';
+          favBtn.type = 'button';
+          favBtn.style.position = 'absolute';
+          favBtn.style.top = '8px';
+          favBtn.style.right = '88px';
+          favBtn.style.zIndex = 3;
+          favBtn.style.background = 'var(--background)';
+          favBtn.style.color = favorite ? 'gold' : 'var(--secondary)';
+          favBtn.style.border = 'none';
+          favBtn.style.borderRadius = '50%';
+          favBtn.style.width = '32px';
+          favBtn.style.height = '32px';
+          favBtn.style.fontSize = '20px';
+          favBtn.style.cursor = 'pointer';
+          favBtn.style.boxShadow = '0 2px 8px rgba(0,0,0,0.12)';
+          favBtn.style.transition = 'color 0.2s';
+          favBtn.onclick = (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            setFavorite(filename, !favorite);
+          };
+          div.appendChild(favBtn);
         }
 
         div.querySelector('img').onclick = async (e) => {
