@@ -6,6 +6,7 @@
 - View images in a responsive masonry grid (Row format)
 - Select and delete single or multiple images
 - Protected upload/delete endpoints
+- Search/filter images by tag or filename
 
 ### Prerequisites
 

@@ -43,6 +43,9 @@
         <option value="tag_desc">Tag (Z-A)</option>
       </select>
     </div>
+    <div>
+      <input id="image-search-input" type="text" placeholder="Search by tag or filename..." style="padding:6px 12px;border-radius:6px;border:1.5px solid var(--secondary);background:var(--background);color:var(--text);font-size:var(--font-size-md);width:220px;">
+    </div>
   </div>
   <div class="masonry" id="masonry"></div>
 
@@ -380,9 +383,17 @@
     let loadedCount = 0;
     const pageSize = 30;
     let loadingImages = false;
+    let searchQuery = '';
 
     document.getElementById('sort-select').addEventListener('change', function() {
       sortOption = this.value;
+      loadedCount = 0;
+      document.getElementById('masonry').innerHTML = '';
+      renderImagesWithInfiniteScroll(true);
+    });
+
+    document.getElementById('image-search-input').addEventListener('input', function() {
+      searchQuery = this.value.trim().toLowerCase();
       loadedCount = 0;
       document.getElementById('masonry').innerHTML = '';
       renderImagesWithInfiniteScroll(true);
@@ -421,6 +432,15 @@
       return sorted;
     }
 
+    function filterImages(images, query) {
+      if (!query) return images;
+      return images.filter(img => {
+        const nameMatch = img.filename.toLowerCase().includes(query);
+        const tagsMatch = (img.tags || []).some(tag => tag.toLowerCase().includes(query));
+        return nameMatch || tagsMatch;
+      });
+    }
+
     async function loadImages() {
       const res = await fetch('/api/images');
       let images = await res.json();
@@ -442,7 +462,9 @@
     function renderImagesWithInfiniteScroll(reset = false) {
       if (loadingImages) return;
       loadingImages = true;
-      const sorted = sortImages(allImages, sortOption);
+      // Filter images by search query
+      let filtered = filterImages(allImages, searchQuery);
+      const sorted = sortImages(filtered, sortOption);
       const masonry = document.getElementById('masonry');
       let start = loadedCount;
       let end = Math.min(loadedCount + pageSize, sorted.length);
