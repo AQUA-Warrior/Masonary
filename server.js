@@ -309,6 +309,39 @@ app.post('/api/download', (req, res) => {
   }
 });
 
+app.get('/api/themes/:id/export', (req, res) => {
+  const id = parseInt(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ error: 'Invalid theme ID' });
+  db.get('SELECT * FROM themes WHERE id = ?', [id], (err, theme) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!theme) return res.status(404).json({ error: 'Theme not found' });
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename=theme-${id}.json`);
+    res.send(JSON.stringify({
+      name: theme.name,
+      colors: typeof theme.colors === 'string' ? JSON.parse(theme.colors) : theme.colors
+    }, null, 2));
+  });
+});
+
+app.post('/api/themes/import', (req, res) => {
+  const { name, colors } = req.body;
+  if (!name || !colors) {
+    return res.status(400).json({ error: 'Name and colors are required' });
+  }
+  db.get('SELECT * FROM themes WHERE name = ?', [name], (err, existing) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (existing) return res.status(400).json({ error: 'Theme name already exists' });
+    db.run('INSERT INTO themes (name, colors) VALUES (?, ?)',
+      [name, JSON.stringify(colors)],
+      function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ id: this.lastID });
+      }
+    );
+  });
+});
+
 app.listen(port, () => {
   console.log(`Server is running at http://localhost:${port}`);
 });

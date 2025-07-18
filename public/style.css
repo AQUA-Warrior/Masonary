@@ -188,7 +188,7 @@
 .theme-item .delete-btn {
     background: var(--delete);
     color: var(--white);
-    display: none;
+    display: flex;
 }
 .theme-item .delete-btn:hover {
     background: #cc0000;
@@ -977,4 +977,25 @@ body::-webkit-scrollbar, html::-webkit-scrollbar {
 }
 #image-search-input:focus {
   border-color: var(--accent);
+}
+
+#theme-export-btn {
+  background: var(--primary);
+  color: var(--background);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-weight: bold;
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: var(--font-size-md);
+  padding: 8px 0;
+  transition: background var(--transition), color var(--transition);
+  margin-top: 0;
+  margin-bottom: 0;
+  width: 100%;
+  display: block;
+}
+#theme-export-btn:hover {
+  background: var(--accent);
+  color: var(--background);
 }

@@ -6,6 +6,13 @@
   <title>masonary layout</title>
   <link rel="stylesheet" href="/style.css">
   <script src="https://unpkg.com/masonry-layout@4/dist/masonry.pkgd.min.js" defer></script>
+  <style>
+.theme-item .delete-btn {
+    background: var(--delete);
+    color: var(--white);
+    display: flex;
+}
+</style>
 </head>
 <body>
   <div id="auth-section">
@@ -138,6 +145,11 @@
       <div class="theme-create">
         <input type="text" id="new-theme-name" placeholder="Theme name">
         <button onclick="saveCurrentTheme()">Save Theme</button>
+        <button id="theme-import-btn" type="button">Import</button>
+        <input type="file" id="theme-import-file" accept="application/json" style="display:none;">
+      </div>
+      <div style="margin-top:10px;">
+        <button id="theme-export-btn" type="button" style="width:100%;">Export Selected Theme</button>
       </div>
     </div>
   </div>
@@ -462,7 +474,6 @@
     function renderImagesWithInfiniteScroll(reset = false) {
       if (loadingImages) return;
       loadingImages = true;
-      // Filter images by search query
       let filtered = filterImages(allImages, searchQuery);
       const sorted = sortImages(filtered, sortOption);
       const masonry = document.getElementById('masonry');
@@ -981,19 +992,107 @@
     document.addEventListener("DOMContentLoaded", checkLogin);
   </script>
   <script>
+
+    let selectedThemeId = null;
     let originalThemeValues = {};
 
-    document.getElementById('theme-btn').addEventListener('click', () => {
-      document.getElementById('theme-popup').classList.toggle('hidden');
-    });
-
-    document.addEventListener('click', (e) => {
-      const popup = document.getElementById('theme-popup');
-      const btn = document.getElementById('theme-btn');
-      if (!popup.contains(e.target) && !btn.contains(e.target)) {
-        popup.classList.add('hidden');
+    function rgbToHex(color) {
+      color = color.trim();
+      if (!color) return '#000000';
+      if (color.startsWith('#')) {
+        if (color.length === 4) {
+          return '#' + color[1] + color[1] + color[2] + color[2] + color[3] + color[3];
+        }
+        return color;
       }
-    });
+      let rgb = color.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+      if (rgb) {
+        return (
+          '#' +
+          ((1 << 24) + (parseInt(rgb[1]) << 16) + (parseInt(rgb[2]) << 8) + parseInt(rgb[3]))
+            .toString(16)
+            .slice(1)
+        );
+      }
+      return '#000000';
+    }
+
+    function updateThemeEditorInputsFromCSS() {
+      const style = getComputedStyle(document.documentElement);
+      document.querySelectorAll('.theme-property input[type="color"]').forEach(input => {
+        const varName = input.dataset.var;
+        const color = style.getPropertyValue(varName).trim();
+        input.value = rgbToHex(color);
+      });
+      document.querySelectorAll('.theme-font-property input, .theme-font-property select').forEach(input => {
+        const varName = input.dataset.var;
+        let value = style.getPropertyValue(varName).trim();
+        if (input.type === 'number') value = parseInt(value);
+        input.value = value;
+      });
+    }
+
+    function showThemeButtons() {
+      document.querySelector('.theme-editor-btn.save-btn').style.display = '';
+      document.querySelector('.theme-editor-btn.revert-btn').style.display = '';
+    }
+    function hideThemeButtons() {
+      document.querySelector('.theme-editor-btn.save-btn').style.display = 'none';
+      document.querySelector('.theme-editor-btn.revert-btn').style.display = 'none';
+    }
+
+    async function saveCurrentTheme() {
+      const name = document.getElementById('new-theme-name').value.trim();
+      if (!name) return alert('Theme name required');
+      const colors = {};
+      document.querySelectorAll('[data-var]').forEach(input => {
+        let val = input.value;
+        if (input.type === 'number') val = `${val}px`;
+        colors[input.dataset.var.replace(/^--/, '')] = val;
+      });
+      const res = await fetch('/api/themes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, colors })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.error || 'Failed to save theme');
+        return;
+      }
+      document.getElementById('new-theme-name').value = '';
+      await loadThemes();
+      hideThemeButtons();
+    }
+
+    function saveThemeChanges() {
+      document.querySelectorAll('[data-var]').forEach(input => {
+        let val = input.value;
+        if (input.type === 'number') val = `${val}px`;
+        document.documentElement.style.setProperty(input.dataset.var, val);
+      });
+      hideThemeButtons();
+      updateThemeEditorInputsFromCSS();
+    }
+
+    function revertThemeChanges() {
+      Object.entries(originalThemeValues).forEach(([varName, value]) => {
+        document.documentElement.style.setProperty(varName, value);
+      });
+      updateThemeEditorInputsFromCSS();
+      hideThemeButtons();
+    }
+
+    async function updateThemeName(id, value) {
+      value = value.trim();
+      if (!value) return;
+      await fetch(`/api/themes/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: value })
+      });
+      await loadThemes();
+    }
 
     async function loadThemes() {
       try {
@@ -1001,7 +1100,7 @@
         const themes = await response.json();
         const themeList = document.getElementById('theme-list');
         themeList.innerHTML = themes.map(theme => `
-          <div class="theme-item">
+          <div class="theme-item" data-theme-id="${theme.id}" style="${selectedThemeId == theme.id ? 'outline:2px solid var(--accent);' : ''}">
             <input type="text" class="theme-name-input"
               value="${theme.name}"
               onchange="updateThemeName(${theme.id}, this.value)"
@@ -1012,42 +1111,79 @@
             </div>
           </div>
         `).join('');
+        if (!selectedThemeId && themes.length > 0) {
+          selectedThemeId = themes[0].id;
+        }
+        document.querySelectorAll('.theme-item').forEach(item => {
+          item.onclick = function(e) {
+            if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+            document.querySelectorAll('.theme-item').forEach(i => i.style.outline = '');
+            this.style.outline = '2px solid var(--accent)';
+            selectedThemeId = parseInt(this.getAttribute('data-theme-id'));
+          };
+        });
       } catch (error) {
         console.error('Error loading themes:', error);
       }
     }
 
-    async function updateThemeName(id, newName) {
-      if (!newName.trim()) return;
-      try {
-        const response = await fetch(`/api/themes/${id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: newName.trim() })
-        });
-        if (!response.ok) {
-          const error = await response.json();
-          alert(error.error);
-          await loadThemes();
-        }
-      } catch (error) {
-        console.error('Error updating theme name:', error);
-        await loadThemes();
+    document.getElementById('theme-export-btn').onclick = async function() {
+      if (!selectedThemeId) {
+        alert('Select a theme to export.');
+        return;
       }
-    }
+      try {
+        const res = await fetch(`/api/themes/${selectedThemeId}/export`);
+        if (!res.ok) {
+          alert('Failed to export theme');
+          return;
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `theme-${selectedThemeId}.json`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          URL.revokeObjectURL(url);
+          a.remove();
+        }, 100);
+      } catch (err) {
+        alert('Export failed');
+      }
+    };
 
-    function rgbToHex(color) {
-      if (color.startsWith('#')) return color;
-      const rgb = color.match(/\d+/g);
-      if (!rgb) return '#000000';
-      const r = parseInt(rgb[0]);
-      const g = parseInt(rgb[1]);
-      const b = parseInt(rgb[2]);
-      return '#' + [r, g, b].map(x => {
-        const hex = x.toString(16);
-        return hex.length === 1 ? '0' + hex : hex;
-      }).join('');
-    }
+    document.getElementById('theme-import-btn').onclick = function() {
+      document.getElementById('theme-import-file').click();
+    };
+    document.getElementById('theme-import-file').onchange = async function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        if (!data.name || !data.colors) {
+          alert('Invalid theme file');
+          return;
+        }
+        const res = await fetch('/api/themes/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          alert(err.error || 'Import failed');
+          return;
+        }
+        await loadThemes();
+        alert('Theme imported!');
+      } catch (err) {
+        alert('Import failed');
+      }
+      e.target.value = '';
+    };
 
     async function applyTheme(id) {
       try {
@@ -1055,38 +1191,29 @@
         const themes = await response.json();
         const theme = themes.find(t => t.id === id);
         if (!theme) return;
-        const colors = JSON.parse(theme.colors);
+        const colors = typeof theme.colors === 'string' ? JSON.parse(theme.colors) : theme.colors;
         localStorage.setItem('activeThemeId', id);
         Object.entries(colors).forEach(([key, value]) => {
           document.documentElement.style.setProperty(`--${key}`, value);
         });
-        document.querySelectorAll('.theme-property input[type="color"]').forEach(input => {
-          const varName = input.dataset.var;
-          if (varName) {
-            const colorName = varName.substring(2);
-            if (colors[colorName]) {
-              input.value = rgbToHex(colors[colorName]);
-            }
-          }
-        });
+        updateThemeEditorInputsFromCSS();
         document.querySelectorAll('.theme-font-property input, .theme-font-property select').forEach(input => {
-          const varName = input.dataset.var;
-          if (varName) {
-            const propName = varName.substring(2);
-            if (colors[propName]) {
-              let value = colors[propName];
-              if (input.type === 'number') {
-                value = parseInt(value.replace('px', ''));
-              }
-              input.value = value;
-            }
+          const varName = input.dataset.var.replace(/^--/, '');
+          if (colors[varName]) {
+            let value = colors[varName];
+            if (input.type === 'number') value = parseInt(value);
+            input.value = value;
+          } else {
+            const style = getComputedStyle(document.documentElement);
+            let value = style.getPropertyValue(input.dataset.var).trim();
+            if (input.type === 'number') value = parseInt(value);
+            input.value = value;
           }
         });
         originalThemeValues = {};
         document.querySelectorAll('[data-var]').forEach(input => {
           const varName = input.dataset.var;
-          const computedValue = getComputedStyle(document.documentElement)
-            .getPropertyValue(varName).trim();
+          const computedValue = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
           originalThemeValues[varName] = computedValue;
         });
         hideThemeButtons();
@@ -1095,117 +1222,6 @@
       }
     }
 
-    async function loadSavedTheme() {
-      const savedThemeId = localStorage.getItem('activeThemeId');
-      if (savedThemeId) {
-        await applyTheme(parseInt(savedThemeId));
-      }
-    }
-
-    function initThemeEditor() {
-      const root = document.documentElement;
-      const style = getComputedStyle(root);
-      originalThemeValues = {};
-      document.querySelectorAll('.theme-property input[type="color"]').forEach(input => {
-        const varName = input.dataset.var;
-        const color = style.getPropertyValue(varName).trim();
-        input.value = rgbToHex(color);
-        originalThemeValues[varName] = color;
-        input.addEventListener('input', (e) => {
-          root.style.setProperty(varName, e.target.value);
-          showThemeButtons();
-        });
-      });
-      document.querySelectorAll('.theme-font-property input, .theme-font-property select').forEach(input => {
-        const varName = input.dataset.var;
-        let value = style.getPropertyValue(varName).trim();
-        if (input.type === 'number') {
-          value = parseInt(value);
-        }
-        input.value = value;
-        originalThemeValues[varName] = value;
-        input.addEventListener('change', (e) => {
-          let newValue = e.target.value;
-          if (input.type === 'number') {
-            newValue = `${newValue}px`;
-          }
-          root.style.setProperty(varName, newValue);
-          showThemeButtons();
-        });
-      });
-    }
-
-    function showThemeButtons() {
-      document.querySelector('.revert-btn').style.display = 'block';
-      document.querySelector('.save-btn').style.display = 'block';
-    }
-    function hideThemeButtons() {
-      document.querySelector('.revert-btn').style.display = 'none';
-      document.querySelector('.save-btn').style.display = 'none';
-    }
-    function revertThemeChanges() {
-      const root = document.documentElement;
-      Object.entries(originalThemeValues).forEach(([varName, value]) => {
-        root.style.setProperty(varName, value);
-        const input = document.querySelector(`[data-var="${varName}"]`);
-        if (input) {
-          if (input.type === 'color') {
-            input.value = rgbToHex(value);
-          } else {
-            input.value = input.type === 'number' ? parseInt(value) : value;
-          }
-        }
-      });
-      hideThemeButtons();
-    }
-    function saveThemeChanges() {
-      const root = document.documentElement;
-      const style = getComputedStyle(root);
-      Object.keys(originalThemeValues).forEach(varName => {
-        originalThemeValues[varName] = style.getPropertyValue(varName).trim();
-      });
-      hideThemeButtons();
-    }
-    async function saveCurrentTheme() {
-      const name = document.getElementById('new-theme-name').value.trim();
-      if (!name) {
-        alert('Please enter a theme name');
-        return;
-      }
-      const colors = {};
-      document.querySelectorAll('[data-var]').forEach(input => {
-        const varName = input.dataset.var.substring(2);
-        let value = getComputedStyle(document.documentElement).getPropertyValue(input.dataset.var).trim();
-        if (input.type === 'number') {
-          value = value.replace('px', '') + 'px';
-        }
-        colors[varName] = value;
-      });
-      try {
-        const response = await fetch('/api/themes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, colors })
-        });
-        if (!response.ok) {
-          const error = await response.json();
-          alert(error.error);
-          return;
-        }
-        const result = await response.json();
-        document.getElementById('new-theme-name').value = '';
-        await loadThemes();
-        await applyTheme(result.id);
-      } catch (error) {
-        console.error('Error saving theme:', error);
-        alert('Failed to save theme');
-      }
-    }
-    document.addEventListener('DOMContentLoaded', async () => {
-      await loadThemes();
-      await loadSavedTheme();
-      initThemeEditor();
-    });
     async function deleteTheme(themeId, event) {
       event.stopPropagation();
       if (!confirm('Are you sure you want to delete this theme?')) return;
@@ -1217,6 +1233,7 @@
           const error = await response.json();
           alert(error.error);
         } else {
+          if (selectedThemeId == themeId) selectedThemeId = null;
           await loadThemes();
         }
       } catch (error) {
@@ -1224,10 +1241,71 @@
         alert('Failed to delete theme');
       }
     }
+    async function loadSavedTheme() {
+      const id = localStorage.getItem('activeThemeId');
+      if (id) await applyTheme(Number(id));
+    }
 
-    window.deleteTheme = deleteTheme;
-    window.applyTheme = applyTheme;
+    function initThemeEditor() {
+      const root = document.documentElement;
+      const style = getComputedStyle(root);
+      originalThemeValues = {};
+      document.querySelectorAll('.theme-property input[type="color"]').forEach(input => {
+        const varName = input.dataset.var;
+        const color = style.getPropertyValue(varName).trim();
+        input.value = rgbToHex(color);
+        originalThemeValues[varName] = color;
+        input.oninput = (e) => {
+          root.style.setProperty(varName, e.target.value);
+          showThemeButtons();
+        };
+      });
+      document.querySelectorAll('.theme-font-property input, .theme-font-property select').forEach(input => {
+        const varName = input.dataset.var;
+        let value = style.getPropertyValue(varName).trim();
+        if (input.type === 'number') value = parseInt(value);
+        input.value = value;
+        originalThemeValues[varName] = value;
+        input.onchange = (e) => {
+          let newValue = e.target.value;
+          if (input.type === 'number') newValue = `${newValue}px`;
+          root.style.setProperty(varName, newValue);
+          showThemeButtons();
+        };
+      });
+      hideThemeButtons();
+    }
+
+    document.getElementById('theme-btn').onclick = function(e) {
+      e.stopPropagation();
+      const popup = document.getElementById('theme-popup');
+      popup.classList.toggle('hidden');
+      if (!popup.classList.contains('hidden')) {
+        updateThemeEditorInputsFromCSS();
+      }
+    };
+
+    document.addEventListener('mousedown', (e) => {
+      const popup = document.getElementById('theme-popup');
+      const btn = document.getElementById('theme-btn');
+      if (!popup.contains(e.target) && !btn.contains(e.target)) {
+        popup.classList.add('hidden');
+      }
+    });
+
+    window.saveCurrentTheme = saveCurrentTheme;
+    window.revertThemeChanges = revertThemeChanges;
+    window.saveThemeChanges = saveThemeChanges;
     window.updateThemeName = updateThemeName;
+    window.applyTheme = applyTheme;
+    window.deleteTheme = deleteTheme;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadThemes();
+      await loadSavedTheme();
+      initThemeEditor();
+      updateThemeEditorInputsFromCSS();
+    });
   </script>
 </body>
 </html>
