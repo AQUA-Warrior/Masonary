@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
@@ -8,8 +9,8 @@ const sqlite3 = require('sqlite3').verbose();
 const archiver = require('archiver');
 
 const app = express();
-const port = 3000;
-const SECRET = 'abc';
+const port = process.env.PORT || 3000;
+const SECRET = process.env.JWT_SECRET;
 
 app.use(cors());
 app.use(express.json());
@@ -31,9 +32,13 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 * 1024 } // 5GB
 });
 
-const USER = { username: 'abc', password: 'abc' }; // remove later
+const USER = { 
+  username: (process.env.APP_USERNAME || ''), 
+  password: (process.env.APP_PASSWORD || '')
+};
 
-const db = new sqlite3.Database(path.join(__dirname, 'themes.db'));
+const DB_NAME = process.env.DB_NAME || 'themes.db';
+const db = new sqlite3.Database(path.join(__dirname, DB_NAME));
 
 db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS themes (

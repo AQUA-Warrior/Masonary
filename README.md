@@ -15,6 +15,10 @@
 - Node.js
 - npm
 
+### .env setup
+
+- Copy .env.example to .env and fill in your production secrets
+
 ### Installation
 `npm install`
 
@@ -22,11 +26,6 @@
 1. Start the server: `node server.js`
 2. For development with auo reload: `npm run devStart`
 2. Open your browser and go to: [http://localhost:3000](http://localhost:3000).
-
-### Default Login
-
-- **Username:** abc
-- **Password:** abc
 
 ## Project Structure
 
