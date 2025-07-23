@@ -398,31 +398,28 @@
 
     let sortOption = 'date_desc';
     let allImages = [];
-    let loadedCount = 0;
-    const pageSize = 30;
-    let loadingImages = false;
     let searchQuery = '';
     let favoritesOnly = false;
 
+    function resetAndRenderImages() {
+      document.getElementById('masonry').innerHTML = '';
+      renderAllImages();
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+
     document.getElementById('sort-select').addEventListener('change', function() {
       sortOption = this.value;
-      loadedCount = 0;
-      document.getElementById('masonry').innerHTML = '';
-      renderImagesWithInfiniteScroll(true);
+      resetAndRenderImages();
     });
 
     document.getElementById('image-search-input').addEventListener('input', function() {
       searchQuery = this.value.trim().toLowerCase();
-      loadedCount = 0;
-      document.getElementById('masonry').innerHTML = '';
-      renderImagesWithInfiniteScroll(true);
+      resetAndRenderImages();
     });
 
     document.getElementById('favorites-only-checkbox').addEventListener('change', function() {
       favoritesOnly = this.checked;
-      loadedCount = 0;
-      document.getElementById('masonry').innerHTML = '';
-      renderImagesWithInfiniteScroll(true);
+      resetAndRenderImages();
     });
 
     function sortImages(images, option) {
@@ -497,7 +494,7 @@
       });
     }
 
-    async function loadImages(restoreScrollY = null) {
+    async function loadImages() {
       const res = await fetch('/api/images');
       let images = await res.json();
       await Promise.all(images.map(async img => {
@@ -510,49 +507,20 @@
         } catch {}
       }));
       allImages = images;
-      loadedCount = 0;
       document.getElementById('masonry').innerHTML = '';
-      renderImagesWithInfiniteScroll(true, restoreScrollY);
+      renderAllImages();
     }
 
-    function renderImagesWithInfiniteScroll(reset = false, restoreScrollY = null) {
-      if (loadingImages) return;
-      loadingImages = true;
+    function renderAllImages() {
       let filtered = filterImages(allImages, searchQuery);
       const sorted = sortImages(filtered, sortOption);
-      const masonry = document.getElementById('masonry');
-      let start = loadedCount;
-      let end = Math.min(loadedCount + pageSize, sorted.length);
-      const imagesToRender = sorted.slice(start, end);
-      loadedCount = end;
-      if (reset) {
-        masonry.innerHTML = '';
-        loadedCount = imagesToRender.length;
-      }
-      renderImages(imagesToRender, loggedInGlobal, masonry, reset);
-      loadingImages = false;
-      if (restoreScrollY !== null) {
-        window.scrollTo({ top: restoreScrollY, behavior: 'auto' });
-      }
+      renderImages(sorted, loggedInGlobal, document.getElementById('masonry'), true);
     }
-
-    window.addEventListener('scroll', () => {
-      if (loadingImages) return;
-      const masonry = document.getElementById('masonry');
-      if (
-        window.innerHeight + window.scrollY >=
-        (masonry.offsetTop + masonry.offsetHeight - 300)
-      ) {
-        if (loadedCount < allImages.length) {
-          renderImagesWithInfiniteScroll();
-        }
-      }
-    });
 
     function renderImages(images, loggedIn, masonryOverride = null, reset = false) {
       const masonry = masonryOverride || document.getElementById('masonry');
       const imageElements = [];
-      images.forEach(imgObj => {
+      images.forEach((imgObj) => {
         const { url, filename, tags, favorite } = imgObj;
         const div = document.createElement('div');
         div.className = 'masonry-item';
@@ -782,9 +750,8 @@
         } catch {}
       }));
       allImages = images;
-      loadedCount = 0;
       document.getElementById('masonry').innerHTML = '';
-      renderImagesWithInfiniteScroll(true);
+      renderAllImages();
     }
 
     document.getElementById('login-form').onsubmit = async e => {
